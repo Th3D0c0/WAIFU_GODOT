@@ -29,6 +29,31 @@ scons platform=windows target=template_release -j32
 **Builds are long — always run them with `run_in_background` and keep working**, then read the
 result. Never block on a compile.
 
+## Pre-commit hooks (prek) — run these before pushing
+
+CI runs Godot's full `prek` hook suite on every push. Formatting failures there are avoidable;
+set the hooks up locally once:
+
+```sh
+pip install prek        # or: uv tool install prek
+prek install            # install the git hook shims — hooks now run at commit time
+prek run --all-files    # one-time full pass
+prek run --files <paths>   # reproduce a CI failure for specific files
+```
+
+prek downloads its own pinned **clang-format v21.1.7** (`.pre-commit-config.yaml`). Do not
+install clang-format separately — a different version formats differently than CI and will
+fight the hooks.
+
+Hooks that have bitten this fork before:
+
+- **clang-format** — wants includes as one alphabetically sorted block, not multiple
+  blank-line-separated groups. It rewrites files in place; just re-stage them.
+- **validate-codeowners** — every new file under `modules/` must be covered by
+  `.github/CODEOWNERS`, or CI fails with `<UNOWNED>`. See the fork-local block at EOF of that
+  file; add new modules there. Verify locally with
+  `python misc/scripts/validate_codeowners.py --unowned` (exit 0 = clean).
+
 Run the module unit tests (requires a `tests=yes` build):
 
 ```sh
@@ -72,7 +97,15 @@ Therefore:
 - Keep any unavoidable core patches small, self-contained, and listed here so rebases have
   a checklist.
 
-**Current core patches: none.** (Keep this line accurate.)
+### Current upstream-file diffs
+
+Keep this list accurate — it is the rebase checklist.
+
+| File | Change | Why |
+|---|---|---|
+| `.github/CODEOWNERS` | 6-line fork-local block appended at EOF, `/modules/waifu_test/ @Th3D0c0` | Required by the `validate-codeowners` CI hook; every file under `modules/` must have an owner. Placed at EOF (last-match-wins) so it also claims the module's `SCsub`/`config.py`, and because appending conflicts less than inserting into the Modules section. |
+
+No diffs under `core/`, `scene/`, `servers/`, or `drivers/`. Keep it that way.
 
 ## Rebasing on upstream
 

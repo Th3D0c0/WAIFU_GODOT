@@ -35,9 +35,8 @@
 #include "core/object/class_db.h"
 #include "core/object/method_bind.h"
 #include "core/string/ustring.h"
-#include "tests/test_macros.h"
-
 #include "tests/signal_watcher.h"
+#include "tests/test_macros.h"
 
 namespace TestWaifuTest {
 
