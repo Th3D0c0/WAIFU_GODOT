@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="WaifuTest" inherits="RefCounted" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		Sample class provided by the [code]waifu_test[/code] engine module.
+	</brief_description>
+	<description>
+		A minimal class used to verify that a custom C++ engine module is compiled into the binary, registered with [ClassDB] and reachable from scripting. It exposes a greeting, an accumulating counter and a static helper.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="accumulate">
+			<return type="int" />
+			<param index="0" name="amount" type="int" default="1" />
+			<description>
+				Adds [param amount] to the counter and returns its new value. Emits [signal counter_changed].
+			</description>
+		</method>
+		<method name="fibonacci" qualifiers="static">
+			<return type="int" />
+			<param index="0" name="n" type="int" />
+			<description>
+				Returns the [param n]-th number of the Fibonacci sequence, starting at [code]0[/code]. Returns [code]0[/code] and prints an error if [param n] is negative.
+			</description>
+		</method>
+		<method name="get_counter" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the current value of the counter.
+			</description>
+		</method>
+		<method name="greet" qualifiers="const">
+			<return type="String" />
+			<param index="0" name="name" type="String" />
+			<description>
+				Returns [member greeting] addressed to [param name], punctuated according to [member mood].
+			</description>
+		</method>
+		<method name="reset">
+			<return type="void" />
+			<description>
+				Sets the counter back to [code]0[/code]. Emits [signal counter_changed] only if the counter was not already [code]0[/code].
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="greeting" type="String" setter="set_greeting" getter="get_greeting" default="&quot;Hello&quot;">
+			The word used to open a greeting returned by [method greet].
+		</member>
+		<member name="mood" type="int" setter="set_mood" getter="get_mood" enum="WaifuTest.Mood" default="0">
+			How the greeting returned by [method greet] is punctuated.
+		</member>
+	</members>
+	<signals>
+		<signal name="counter_changed">
+			<param index="0" name="value" type="int" />
+			<description>
+				Emitted whenever the counter changes, with its new [param value].
+			</description>
+		</signal>
+	</signals>
+	<constants>
+		<constant name="MOOD_HAPPY" value="0" enum="Mood">
+			Greetings end with an exclamation mark.
+		</constant>
+		<constant name="MOOD_NEUTRAL" value="1" enum="Mood">
+			Greetings end with a period.
+		</constant>
+		<constant name="MOOD_GRUMPY" value="2" enum="Mood">
+			Greetings end with an ellipsis.
+		</constant>
+		<constant name="MOOD_MAX" value="3" enum="Mood">
+			Represents the size of the [enum Mood] enum.
+		</constant>
+	</constants>
+</class>
