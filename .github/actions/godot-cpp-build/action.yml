@@ -21,13 +21,17 @@ inputs:
 runs:
   using: composite
   steps:
+    # Cloned outside the workspace, and to a deliberately short path: SCons hands the
+    # full `ar` command line to `sh -c` as a single argument, which the kernel caps at
+    # 128 KiB (MAX_ARG_STRLEN). godot-cpp archives ~1100 objects referenced by absolute
+    # path, so the workspace path length alone decides whether the archive step fits.
     - name: Checkout
-      uses: actions/checkout@v6
-      with:
-        submodules: recursive
-        repository: godotengine/godot-cpp
-        ref: ${{ inputs.godot-cpp-branch }}
-        path: godot-cpp
+      shell: sh
+      run: |
+        rm -rf "$HOME/gdcpp"
+        git clone --depth 1 --recurse-submodules --shallow-submodules \
+          --branch "${{ inputs.godot-cpp-branch }}" \
+          https://github.com/godotengine/godot-cpp.git "$HOME/gdcpp"
 
     - name: Extract API
       shell: sh
@@ -37,4 +41,4 @@ runs:
       shell: sh
       env:
         SCONS_CACHE: ${{ inputs.scons-cache }}
-      run: scons --directory=./godot-cpp/test "gdextension_dir=${{ github.workspace }}" ${{ inputs.scons-flags }}
+      run: scons --directory="$HOME/gdcpp/test" "gdextension_dir=${{ github.workspace }}" ${{ inputs.scons-flags }}
