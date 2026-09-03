@@ -76,6 +76,9 @@ skip = [
 	"platform/web/package-lock.json",
 ]
 ignore-words-list = [
+	# Box3D's b3MotionLocks field names (linearX/linearY/linearZ). Without this,
+	# codespell rewrites "linearY" to "linearly" and the module stops compiling.
+	"lineary",
 	"breaked",
 	"cancelled",
 	"checkin",

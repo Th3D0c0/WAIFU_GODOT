@@ -55,6 +55,23 @@ class Box3DJoint3D;
 // and _destroy() tears the Box3D side back down when the space is cleared. State
 // therefore lives in this object, not in Box3D, and Box3D is treated as a cache.
 class Box3DBody3D : public Box3DCollisionObject3D {
+public:
+	// One resolved contact, in the shape Godot's direct body state reports them.
+	struct Contact {
+		Vector3 local_position;
+		Vector3 local_normal;
+		Vector3 collider_position;
+		Vector3 impulse;
+		// The collider's own velocity at the contact point, which is what a body resting
+		// on a moving platform needs in order to be carried by it.
+		Vector3 collider_velocity_at_position;
+		int local_shape = 0;
+		int collider_shape = 0;
+		RID collider;
+		ObjectID collider_id;
+	};
+
+private:
 	struct ShapeSlot {
 		Box3DShape3D *shape = nullptr;
 		Transform3D transform;
@@ -85,9 +102,23 @@ class Box3DBody3D : public Box3DCollisionObject3D {
 	bool ray_pickable = true;
 	bool omit_force_integration = false;
 
+	// Constant forces are Godot's "keep applying this every step" accumulator. Box3D
+	// clears applied forces each step like any impulse-based solver, so they are held
+	// here and re-applied from the space before every step.
+	Vector3 constant_force;
+	Vector3 constant_torque;
+
+	// Godot's axis locks are a bitmask of BodyAxis; Box3D takes a b3MotionLocks struct.
+	uint32_t locked_axes = 0;
+
+	int max_contacts_reported = 0;
+	real_t contact_depth_threshold = 0.0;
+	HashSet<RID> collision_exceptions;
+
 	Callable state_sync_callback;
 	LocalVector<ShapeSlot> shapes;
 	Box3DDirectBodyState3D *direct_state = nullptr;
+	mutable LocalVector<Contact> contacts;
 	// Joints referencing this body. A Box3D constraint can only exist while both its
 	// endpoints are resident in the same world, so every joint here has to be told
 	// when this body enters or leaves a space.
@@ -174,6 +205,46 @@ public:
 	// never have their direct state asked for, and Godot only reaches for it through
 	// body_get_direct_state() or the state sync callback.
 	Box3DDirectBodyState3D *get_direct_state();
+
+	void set_constant_force(const Vector3 &p_force) { constant_force = p_force; }
+	Vector3 get_constant_force() const { return constant_force; }
+	void set_constant_torque(const Vector3 &p_torque) { constant_torque = p_torque; }
+	Vector3 get_constant_torque() const { return constant_torque; }
+	// Called by the space immediately before each step; see the note on the members.
+	void apply_constant_forces();
+
+	void set_axis_lock(PhysicsServer3D::BodyAxis p_axis, bool p_locked);
+	bool is_axis_locked(PhysicsServer3D::BodyAxis p_axis) const { return (locked_axes & (uint32_t)p_axis) != 0; }
+
+	void set_max_contacts_reported(int p_count) { max_contacts_reported = MAX(0, p_count); }
+	int get_max_contacts_reported() const { return max_contacts_reported; }
+	void set_contact_depth_threshold(real_t p_threshold) { contact_depth_threshold = p_threshold; }
+	real_t get_contact_depth_threshold() const { return contact_depth_threshold; }
+
+	void reset_mass_properties();
+
+	// Adding or removing an exception flips whether the shapes ask Box3D to consult the
+	// world's custom filter, so the shapes are rebuilt rather than just the set edited.
+	void add_collision_exception(const RID &p_body) {
+		collision_exceptions.insert(p_body);
+		_rebuild_shapes();
+	}
+	void remove_collision_exception(const RID &p_body) {
+		collision_exceptions.erase(p_body);
+		_rebuild_shapes();
+	}
+	const HashSet<RID> &get_collision_exceptions() const { return collision_exceptions; }
+	bool has_collision_exception(const RID &p_body) const { return collision_exceptions.has(p_body); }
+
+	// Mass properties, read straight from Box3D so they reflect what the solver uses.
+	Vector3 get_center_of_mass() const;
+	Vector3 get_center_of_mass_local() const;
+	Basis get_inverse_inertia_tensor() const;
+	Vector3 get_velocity_at_local_position(const Vector3 &p_local_position) const;
+
+	// Refreshed on demand rather than every step: most bodies never have their contacts
+	// asked for, and b3Body_GetContactData copies manifolds out of the solver.
+	const LocalVector<Contact> &get_contacts() const;
 
 	void add_joint(Box3DJoint3D *p_joint) { joints.insert(p_joint); }
 	void remove_joint(Box3DJoint3D *p_joint) { joints.erase(p_joint); }

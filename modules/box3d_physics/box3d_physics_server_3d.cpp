@@ -1196,3 +1196,124 @@ bool Box3DPhysicsServer3D::body_test_motion(RID p_body, const MotionParameters &
 	}
 	return true;
 }
+
+/* BODY: CONTACTS, FORCES, LOCKS AND EXCEPTIONS */
+
+void Box3DPhysicsServer3D::body_set_max_contacts_reported(RID p_body, int p_amount) {
+	Box3DBody3D *body = body_owner.get_or_null(p_body);
+	ERR_FAIL_NULL(body);
+	body->set_max_contacts_reported(p_amount);
+}
+
+int Box3DPhysicsServer3D::body_get_max_contacts_reported(RID p_body) const {
+	const Box3DBody3D *body = body_owner.get_or_null(p_body);
+	ERR_FAIL_NULL_V(body, 0);
+	return body->get_max_contacts_reported();
+}
+
+void Box3DPhysicsServer3D::body_set_contacts_reported_depth_threshold(RID p_body, real_t p_threshold) {
+	Box3DBody3D *body = body_owner.get_or_null(p_body);
+	ERR_FAIL_NULL(body);
+	body->set_contact_depth_threshold(p_threshold);
+}
+
+real_t Box3DPhysicsServer3D::body_get_contacts_reported_depth_threshold(RID p_body) const {
+	const Box3DBody3D *body = body_owner.get_or_null(p_body);
+	ERR_FAIL_NULL_V(body, 0);
+	return body->get_contact_depth_threshold();
+}
+
+void Box3DPhysicsServer3D::body_add_constant_central_force(RID p_body, const Vector3 &p_force) {
+	Box3DBody3D *body = body_owner.get_or_null(p_body);
+	ERR_FAIL_NULL(body);
+	body->set_constant_force(body->get_constant_force() + p_force);
+}
+
+void Box3DPhysicsServer3D::body_add_constant_force(RID p_body, const Vector3 &p_force, const Vector3 &p_position) {
+	Box3DBody3D *body = body_owner.get_or_null(p_body);
+	ERR_FAIL_NULL(body);
+	body->set_constant_force(body->get_constant_force() + p_force);
+	const Vector3 arm = p_position - body->get_center_of_mass_local();
+	body->set_constant_torque(body->get_constant_torque() + arm.cross(p_force));
+}
+
+void Box3DPhysicsServer3D::body_add_constant_torque(RID p_body, const Vector3 &p_torque) {
+	Box3DBody3D *body = body_owner.get_or_null(p_body);
+	ERR_FAIL_NULL(body);
+	body->set_constant_torque(body->get_constant_torque() + p_torque);
+}
+
+void Box3DPhysicsServer3D::body_set_constant_force(RID p_body, const Vector3 &p_force) {
+	Box3DBody3D *body = body_owner.get_or_null(p_body);
+	ERR_FAIL_NULL(body);
+	body->set_constant_force(p_force);
+}
+
+Vector3 Box3DPhysicsServer3D::body_get_constant_force(RID p_body) const {
+	const Box3DBody3D *body = body_owner.get_or_null(p_body);
+	ERR_FAIL_NULL_V(body, Vector3());
+	return body->get_constant_force();
+}
+
+void Box3DPhysicsServer3D::body_set_constant_torque(RID p_body, const Vector3 &p_torque) {
+	Box3DBody3D *body = body_owner.get_or_null(p_body);
+	ERR_FAIL_NULL(body);
+	body->set_constant_torque(p_torque);
+}
+
+Vector3 Box3DPhysicsServer3D::body_get_constant_torque(RID p_body) const {
+	const Box3DBody3D *body = body_owner.get_or_null(p_body);
+	ERR_FAIL_NULL_V(body, Vector3());
+	return body->get_constant_torque();
+}
+
+void Box3DPhysicsServer3D::body_set_axis_velocity(RID p_body, const Vector3 &p_axis_velocity) {
+	Box3DBody3D *body = body_owner.get_or_null(p_body);
+	ERR_FAIL_NULL(body);
+	// Replaces the component of the current velocity along the given axis and leaves
+	// the rest alone - the jump-without-losing-run-speed primitive.
+	const Vector3 axis = p_axis_velocity.normalized();
+	Vector3 velocity = body->get_linear_velocity();
+	velocity -= axis * axis.dot(velocity);
+	velocity += p_axis_velocity;
+	body->set_linear_velocity(velocity);
+}
+
+void Box3DPhysicsServer3D::body_set_axis_lock(RID p_body, BodyAxis p_axis, bool p_lock) {
+	Box3DBody3D *body = body_owner.get_or_null(p_body);
+	ERR_FAIL_NULL(body);
+	body->set_axis_lock(p_axis, p_lock);
+}
+
+bool Box3DPhysicsServer3D::body_is_axis_locked(RID p_body, BodyAxis p_axis) const {
+	const Box3DBody3D *body = body_owner.get_or_null(p_body);
+	ERR_FAIL_NULL_V(body, false);
+	return body->is_axis_locked(p_axis);
+}
+
+void Box3DPhysicsServer3D::body_add_collision_exception(RID p_body, RID p_body_b) {
+	Box3DBody3D *body = body_owner.get_or_null(p_body);
+	ERR_FAIL_NULL(body);
+	body->add_collision_exception(p_body_b);
+}
+
+void Box3DPhysicsServer3D::body_remove_collision_exception(RID p_body, RID p_body_b) {
+	Box3DBody3D *body = body_owner.get_or_null(p_body);
+	ERR_FAIL_NULL(body);
+	body->remove_collision_exception(p_body_b);
+}
+
+void Box3DPhysicsServer3D::body_get_collision_exceptions(RID p_body, List<RID> *p_exceptions) {
+	const Box3DBody3D *body = body_owner.get_or_null(p_body);
+	ERR_FAIL_NULL(body);
+	ERR_FAIL_NULL(p_exceptions);
+	for (const RID &rid : body->get_collision_exceptions()) {
+		p_exceptions->push_back(rid);
+	}
+}
+
+void Box3DPhysicsServer3D::body_reset_mass_properties(RID p_body) {
+	Box3DBody3D *body = body_owner.get_or_null(p_body);
+	ERR_FAIL_NULL(body);
+	body->reset_mass_properties();
+}

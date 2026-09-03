@@ -149,7 +149,7 @@ public:
 	virtual uint32_t body_get_user_flags(RID p_body) const override; // TODO
 	virtual void body_set_param(RID p_body, BodyParameter p_param, const Variant &p_value) override;
 	virtual Variant body_get_param(RID p_body, BodyParameter p_param) const override;
-	virtual void body_reset_mass_properties(RID p_body) override; // TODO
+	virtual void body_reset_mass_properties(RID p_body) override;
 	virtual void body_set_state(RID p_body, BodyState p_state, const Variant &p_variant) override;
 	virtual Variant body_get_state(RID p_body, BodyState p_state) const override;
 	virtual void body_apply_central_impulse(RID p_body, const Vector3 &p_impulse) override;
@@ -158,23 +158,23 @@ public:
 	virtual void body_apply_central_force(RID p_body, const Vector3 &p_force) override;
 	virtual void body_apply_force(RID p_body, const Vector3 &p_force, const Vector3 &p_position) override;
 	virtual void body_apply_torque(RID p_body, const Vector3 &p_torque) override;
-	virtual void body_add_constant_central_force(RID p_body, const Vector3 &p_force) override; // TODO
-	virtual void body_add_constant_force(RID p_body, const Vector3 &p_force, const Vector3 &p_position) override; // TODO
-	virtual void body_add_constant_torque(RID p_body, const Vector3 &p_torque) override; // TODO
-	virtual void body_set_constant_force(RID p_body, const Vector3 &p_force) override; // TODO
-	virtual Vector3 body_get_constant_force(RID p_body) const override; // TODO
-	virtual void body_set_constant_torque(RID p_body, const Vector3 &p_torque) override; // TODO
-	virtual Vector3 body_get_constant_torque(RID p_body) const override; // TODO
-	virtual void body_set_axis_velocity(RID p_body, const Vector3 &p_axis_velocity) override; // TODO
-	virtual void body_set_axis_lock(RID p_body, BodyAxis p_axis, bool p_lock) override; // TODO
-	virtual bool body_is_axis_locked(RID p_body, BodyAxis p_axis) const override; // TODO
-	virtual void body_add_collision_exception(RID p_body, RID p_body_b) override; // TODO
-	virtual void body_remove_collision_exception(RID p_body, RID p_body_b) override; // TODO
-	virtual void body_get_collision_exceptions(RID p_body, List<RID> *p_exceptions) override; // TODO
-	virtual void body_set_max_contacts_reported(RID p_body, int p_contacts) override; // TODO
-	virtual int body_get_max_contacts_reported(RID p_body) const override; // TODO
-	virtual void body_set_contacts_reported_depth_threshold(RID p_body, real_t p_threshold) override; // TODO
-	virtual real_t body_get_contacts_reported_depth_threshold(RID p_body) const override; // TODO
+	virtual void body_add_constant_central_force(RID p_body, const Vector3 &p_force) override;
+	virtual void body_add_constant_force(RID p_body, const Vector3 &p_force, const Vector3 &p_position) override;
+	virtual void body_add_constant_torque(RID p_body, const Vector3 &p_torque) override;
+	virtual void body_set_constant_force(RID p_body, const Vector3 &p_force) override;
+	virtual Vector3 body_get_constant_force(RID p_body) const override;
+	virtual void body_set_constant_torque(RID p_body, const Vector3 &p_torque) override;
+	virtual Vector3 body_get_constant_torque(RID p_body) const override;
+	virtual void body_set_axis_velocity(RID p_body, const Vector3 &p_axis_velocity) override;
+	virtual void body_set_axis_lock(RID p_body, BodyAxis p_axis, bool p_lock) override;
+	virtual bool body_is_axis_locked(RID p_body, BodyAxis p_axis) const override;
+	virtual void body_add_collision_exception(RID p_body, RID p_body_b) override;
+	virtual void body_remove_collision_exception(RID p_body, RID p_body_b) override;
+	virtual void body_get_collision_exceptions(RID p_body, List<RID> *p_exceptions) override;
+	virtual void body_set_max_contacts_reported(RID p_body, int p_contacts) override;
+	virtual int body_get_max_contacts_reported(RID p_body) const override;
+	virtual void body_set_contacts_reported_depth_threshold(RID p_body, real_t p_threshold) override;
+	virtual real_t body_get_contacts_reported_depth_threshold(RID p_body) const override;
 	virtual void body_set_omit_force_integration(RID p_body, bool p_omit) override;
 	virtual bool body_is_omitting_force_integration(RID p_body) const override;
 	virtual void body_set_state_sync_callback(RID p_body, const Callable &p_callable) override;

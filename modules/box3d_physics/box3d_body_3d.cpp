@@ -69,6 +69,17 @@ void Box3DBody3D::_build() {
 	// userData and a transform, can be resolved without a side table.
 	body_def.userData = static_cast<Box3DCollisionObject3D *>(this);
 
+	// Godot configures axis locks on the node before it enters the tree, so by the time
+	// the b3 body exists the locks are already recorded and have to be replayed here -
+	// applying them only in set_axis_lock() silently drops every lock authored in the
+	// editor.
+	body_def.motionLocks.linearX = (locked_axes & PhysicsServer3D::BODY_AXIS_LINEAR_X) != 0;
+	body_def.motionLocks.linearY = (locked_axes & PhysicsServer3D::BODY_AXIS_LINEAR_Y) != 0;
+	body_def.motionLocks.linearZ = (locked_axes & PhysicsServer3D::BODY_AXIS_LINEAR_Z) != 0;
+	body_def.motionLocks.angularX = (locked_axes & PhysicsServer3D::BODY_AXIS_ANGULAR_X) != 0;
+	body_def.motionLocks.angularY = (locked_axes & PhysicsServer3D::BODY_AXIS_ANGULAR_Y) != 0;
+	body_def.motionLocks.angularZ = (locked_axes & PhysicsServer3D::BODY_AXIS_ANGULAR_Z) != 0;
+
 	if (mode == PhysicsServer3D::BODY_MODE_RIGID_LINEAR) {
 		body_def.motionLocks.angularX = true;
 		body_def.motionLocks.angularY = true;
@@ -141,6 +152,10 @@ void Box3DBody3D::_rebuild_shapes() {
 		// the flag applies to both sides and is false by default (types.h:489). Without
 		// this every Area3D in the scene silently detects nothing.
 		shape_def.enableSensorEvents = true;
+		// Box3D only consults the world's custom filter when one of the two shapes asks
+		// for it (types.h:68), so this is switched on per body rather than globally -
+		// a scene with no collision exceptions pays nothing for the mechanism.
+		shape_def.enableCustomFiltering = !collision_exceptions.is_empty();
 		// Deferred so a body with several shapes recomputes its mass once, below.
 		shape_def.updateBodyMass = false;
 
@@ -496,4 +511,171 @@ Box3DBody3D::~Box3DBody3D() {
 			slot.shape->remove_dependent(this);
 		}
 	}
+}
+
+void Box3DBody3D::reset_mass_properties() {
+	// Godot's reset means "forget the authored mass and recompute from the shapes",
+	// which is exactly what _rebuild_shapes does before it applies the override - so
+	// clearing the override first and rebuilding is the whole operation.
+	mass = 0;
+	_rebuild_shapes();
+	if (B3_IS_NON_NULL(body_id)) {
+		mass = (real_t)b3Body_GetMass(body_id);
+	}
+}
+
+void Box3DBody3D::apply_constant_forces() {
+	if (!B3_IS_NON_NULL(body_id)) {
+		return;
+	}
+	// Godot's constant force is a standing request, but Box3D clears accumulated force
+	// at the end of every step like any impulse-based solver, so it has to be re-applied
+	// each time rather than set once.
+	if (constant_force != Vector3()) {
+		b3Body_ApplyForceToCenter(body_id, to_b3(constant_force), true);
+	}
+	if (constant_torque != Vector3()) {
+		b3Body_ApplyTorque(body_id, to_b3(constant_torque), true);
+	}
+}
+
+void Box3DBody3D::set_axis_lock(PhysicsServer3D::BodyAxis p_axis, bool p_locked) {
+	if (p_locked) {
+		locked_axes |= (uint32_t)p_axis;
+	} else {
+		locked_axes &= ~(uint32_t)p_axis;
+	}
+
+	if (!B3_IS_NON_NULL(body_id)) {
+		return;
+	}
+	b3MotionLocks locks = {};
+	locks.linearX = (locked_axes & PhysicsServer3D::BODY_AXIS_LINEAR_X) != 0;
+	locks.linearY = (locked_axes & PhysicsServer3D::BODY_AXIS_LINEAR_Y) != 0;
+	locks.linearZ = (locked_axes & PhysicsServer3D::BODY_AXIS_LINEAR_Z) != 0;
+	locks.angularX = (locked_axes & PhysicsServer3D::BODY_AXIS_ANGULAR_X) != 0;
+	locks.angularY = (locked_axes & PhysicsServer3D::BODY_AXIS_ANGULAR_Y) != 0;
+	locks.angularZ = (locked_axes & PhysicsServer3D::BODY_AXIS_ANGULAR_Z) != 0;
+	// BODY_MODE_RIGID_LINEAR is Godot's other route to the same three angular locks, so
+	// it is folded in here rather than fighting with them.
+	if (mode == PhysicsServer3D::BODY_MODE_RIGID_LINEAR) {
+		locks.angularX = true;
+		locks.angularY = true;
+		locks.angularZ = true;
+	}
+	b3Body_SetMotionLocks(body_id, locks);
+}
+
+Vector3 Box3DBody3D::get_center_of_mass() const {
+	if (!B3_IS_NON_NULL(body_id)) {
+		return transform.origin;
+	}
+	return to_godot(b3Body_GetWorldCenterOfMass(body_id));
+}
+
+Vector3 Box3DBody3D::get_center_of_mass_local() const {
+	if (!B3_IS_NON_NULL(body_id)) {
+		return Vector3();
+	}
+	return to_godot(b3Body_GetLocalCenterOfMass(body_id));
+}
+
+Basis Box3DBody3D::get_inverse_inertia_tensor() const {
+	if (!B3_IS_NON_NULL(body_id)) {
+		return Basis();
+	}
+	const b3MassData mass_data = b3Body_GetMassData(body_id);
+	// b3Matrix3 is column-major (cx, cy, cz), which is also how Godot's Basis is
+	// addressed through set_column, so the inversion is the only real work.
+	Basis inertia;
+	inertia.set_column(Vector3::AXIS_X, to_godot(mass_data.inertia.cx));
+	inertia.set_column(Vector3::AXIS_Y, to_godot(mass_data.inertia.cy));
+	inertia.set_column(Vector3::AXIS_Z, to_godot(mass_data.inertia.cz));
+
+	// A static or fully angular-locked body has a singular inertia tensor, and Godot
+	// spells "infinitely resistant to rotation" as a zero inverse rather than as an
+	// inversion that would blow up.
+	if (Math::is_zero_approx(inertia.determinant())) {
+		return Basis(Vector3(), Vector3(), Vector3());
+	}
+	return inertia.inverse();
+}
+
+Vector3 Box3DBody3D::get_velocity_at_local_position(const Vector3 &p_local_position) const {
+	if (!B3_IS_NON_NULL(body_id)) {
+		return Vector3();
+	}
+	return to_godot(b3Body_GetLocalPointVelocity(body_id, to_b3(p_local_position)));
+}
+
+const LocalVector<Box3DBody3D::Contact> &Box3DBody3D::get_contacts() const {
+	contacts.clear();
+	if (!B3_IS_NON_NULL(body_id) || max_contacts_reported <= 0) {
+		return contacts;
+	}
+
+	const int capacity = MIN(b3Body_GetContactCapacity(body_id), max_contacts_reported);
+	if (capacity <= 0) {
+		return contacts;
+	}
+
+	LocalVector<b3ContactData> data;
+	data.resize(capacity);
+	const int count = b3Body_GetContactData(body_id, data.ptr(), capacity);
+
+	const Transform3D body_transform = get_transform();
+	const Vector3 center_of_mass = to_godot(b3Body_GetWorldCenterOfMass(body_id));
+
+	for (int i = 0; i < count && (int)contacts.size() < max_contacts_reported; i++) {
+		const b3ContactData &contact = data[i];
+
+		// Box3D does not order the pair, so which side is "us" has to be established
+		// before the anchors mean anything - they are relative to body A.
+		const b3BodyId body_a = b3Shape_GetBody(contact.shapeIdA);
+		const bool self_is_a = B3_IS_NON_NULL(body_a) && B3_ID_EQUALS(body_a, body_id);
+		const b3ShapeId self_shape = self_is_a ? contact.shapeIdA : contact.shapeIdB;
+		const b3ShapeId other_shape = self_is_a ? contact.shapeIdB : contact.shapeIdA;
+
+		const b3BodyId other_body = b3Shape_GetBody(other_shape);
+		if (!B3_IS_NON_NULL(other_body)) {
+			continue;
+		}
+		Box3DCollisionObject3D *other = static_cast<Box3DCollisionObject3D *>(b3Body_GetUserData(other_body));
+		if (other == nullptr) {
+			continue;
+		}
+
+		for (int m = 0; m < contact.manifoldCount && (int)contacts.size() < max_contacts_reported; m++) {
+			const b3Manifold &manifold = contact.manifolds[m];
+			for (int p = 0; p < manifold.pointCount && (int)contacts.size() < max_contacts_reported; p++) {
+				const b3ManifoldPoint &point = manifold.points[p];
+				if (-point.separation < contact_depth_threshold) {
+					continue;
+				}
+
+				Contact record;
+				// Anchors are world-space offsets from body A's center of mass, so they
+				// become world points first and are only then taken back into local space.
+				const Vector3 anchor_self = to_godot(self_is_a ? point.anchorA : point.anchorB);
+				const Vector3 anchor_other = to_godot(self_is_a ? point.anchorB : point.anchorA);
+				record.local_position = body_transform.xform_inv(center_of_mass + anchor_self);
+				record.collider_position = center_of_mass + anchor_other;
+				// Box3D's manifold normal points from shape A toward shape B. Godot wants it
+				// pointing from the collider back toward this body - a box resting on the
+				// floor reports (0, 1, 0) - so it is negated when this body is A.
+				record.local_normal = to_godot(manifold.normal) * (self_is_a ? -1.0f : 1.0f);
+				record.impulse = record.local_normal * (real_t)point.totalNormalImpulse;
+				record.local_shape = find_shape_index(self_shape);
+				record.collider = other->get_self();
+				record.collider_id = other->get_instance_id();
+				record.collider_shape = other->is_area()
+						? 0
+						: static_cast<Box3DBody3D *>(other)->find_shape_index(other_shape);
+				record.collider_velocity_at_position =
+						to_godot(b3Body_GetWorldPointVelocity(other_body, to_b3_pos(record.collider_position)));
+				contacts.push_back(record);
+			}
+		}
+	}
+	return contacts;
 }

@@ -308,6 +308,34 @@ Verified against Jolt on the same scene: a capsule character walking into a wall
 at x=4.105 (Jolt 4.100) resting at y=0.895 (Jolt 0.901) with `is_on_floor()` true, and
 `cast_motion` returns 0.400 on both backends.
 
+### Contacts, forces and locks
+
+`PhysicsDirectBodyState3D` is complete. Contacts come from `b3Body_GetContactData` on
+demand rather than being accumulated every step, because most bodies never have their
+contacts asked for.
+
+Three orientation and lifetime details that are easy to get backwards:
+
+- **Manifold anchors are relative to body A's center of mass, in world space** — not
+  local to either body, and not relative to the body origin. Box3D does not order the
+  pair, so which side is "us" has to be established before an anchor means anything.
+- **The manifold normal points from shape A toward shape B.** Godot wants it pointing
+  from the collider back toward this body — a box resting on the floor reports
+  `(0, 1, 0)` — so it is negated when this body is A. Getting this backwards is
+  invisible until something reads the normal.
+- **Godot configures axis locks before the node enters the tree**, so by the time the
+  b3 body exists the locks are already recorded. Applying them only in `set_axis_lock()`
+  silently drops every lock authored in the editor; `_build()` has to replay them.
+
+Constant forces have no Box3D counterpart — it clears its force accumulator each step
+like any impulse-based solver — so they are held on the body and re-applied from the
+space immediately before every step.
+
+Collision exceptions are a *pair* rule, which layer and mask bits cannot express, so
+they go through `b3World_SetCustomFilterCallback`. Box3D only consults that callback
+when one of the two shapes set `enableCustomFiltering` (`types.h:68`), so the flag is
+set per body and a scene with no exceptions never reaches the callback at all.
+
 ### Areas are sensors, and userData is shared
 
 `Area3D` maps onto a kinematic Box3D body whose shapes carry `isSensor`. Overlaps

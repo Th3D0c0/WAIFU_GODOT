@@ -157,3 +157,179 @@ RequiredResult<PhysicsDirectSpaceState3D> Box3DDirectBodyState3D::get_space_stat
 	ERR_FAIL_NULL_V(space, nullptr);
 	return space->get_direct_state();
 }
+
+Vector3 Box3DDirectBodyState3D::get_center_of_mass() const {
+	ERR_FAIL_NULL_V(body, Vector3());
+	// Godot's "center of mass" on the state is the offset from the body origin; the
+	// world position is get_center_of_mass() on the node, not here.
+	return body->get_center_of_mass() - body->get_transform().origin;
+}
+
+Vector3 Box3DDirectBodyState3D::get_center_of_mass_local() const {
+	ERR_FAIL_NULL_V(body, Vector3());
+	return body->get_center_of_mass_local();
+}
+
+Basis Box3DDirectBodyState3D::get_principal_inertia_axes() const {
+	ERR_FAIL_NULL_V(body, Basis());
+	// Box3D keeps a full inertia tensor rather than diagonalising it, so there is no
+	// stored principal frame. Identity says "the tensor is already expressed in the
+	// body frame", which is what the tensor accessors below return it in.
+	return Basis();
+}
+
+Vector3 Box3DDirectBodyState3D::get_inverse_inertia() const {
+	ERR_FAIL_NULL_V(body, Vector3());
+	const Basis inverse = body->get_inverse_inertia_tensor();
+	// The diagonal is the inverse inertia about each body axis, which is what Godot
+	// means by the vector form when the tensor is expressed in the body frame.
+	return Vector3(inverse[0][0], inverse[1][1], inverse[2][2]);
+}
+
+Basis Box3DDirectBodyState3D::get_inverse_inertia_tensor() const {
+	ERR_FAIL_NULL_V(body, Basis());
+	return body->get_inverse_inertia_tensor();
+}
+
+Vector3 Box3DDirectBodyState3D::get_velocity_at_local_position(const Vector3 &p_position) const {
+	ERR_FAIL_NULL_V(body, Vector3());
+	return body->get_velocity_at_local_position(p_position);
+}
+
+void Box3DDirectBodyState3D::add_constant_central_force(const Vector3 &p_force) {
+	ERR_FAIL_NULL(body);
+	body->set_constant_force(body->get_constant_force() + p_force);
+}
+
+void Box3DDirectBodyState3D::add_constant_force(const Vector3 &p_force, const Vector3 &p_position) {
+	ERR_FAIL_NULL(body);
+	body->set_constant_force(body->get_constant_force() + p_force);
+	// A force applied off-center also produces a torque about the center of mass.
+	const Vector3 arm = p_position - body->get_center_of_mass_local();
+	body->set_constant_torque(body->get_constant_torque() + arm.cross(p_force));
+}
+
+void Box3DDirectBodyState3D::add_constant_torque(const Vector3 &p_torque) {
+	ERR_FAIL_NULL(body);
+	body->set_constant_torque(body->get_constant_torque() + p_torque);
+}
+
+void Box3DDirectBodyState3D::set_constant_force(const Vector3 &p_force) {
+	ERR_FAIL_NULL(body);
+	body->set_constant_force(p_force);
+}
+
+Vector3 Box3DDirectBodyState3D::get_constant_force() const {
+	ERR_FAIL_NULL_V(body, Vector3());
+	return body->get_constant_force();
+}
+
+void Box3DDirectBodyState3D::set_constant_torque(const Vector3 &p_torque) {
+	ERR_FAIL_NULL(body);
+	body->set_constant_torque(p_torque);
+}
+
+Vector3 Box3DDirectBodyState3D::get_constant_torque() const {
+	ERR_FAIL_NULL_V(body, Vector3());
+	return body->get_constant_torque();
+}
+
+void Box3DDirectBodyState3D::set_collision_layer(uint32_t p_layer) {
+	ERR_FAIL_NULL(body);
+	body->set_collision_layer(p_layer);
+}
+
+uint32_t Box3DDirectBodyState3D::get_collision_layer() const {
+	ERR_FAIL_NULL_V(body, 0);
+	return body->get_collision_layer();
+}
+
+void Box3DDirectBodyState3D::set_collision_mask(uint32_t p_mask) {
+	ERR_FAIL_NULL(body);
+	body->set_collision_mask(p_mask);
+}
+
+uint32_t Box3DDirectBodyState3D::get_collision_mask() const {
+	ERR_FAIL_NULL_V(body, 0);
+	return body->get_collision_mask();
+}
+
+/* CONTACTS */
+//
+// Godot asks for contacts one accessor at a time, all against the same index, so the
+// list is resolved once by get_contacts() and every accessor below indexes into it.
+
+int Box3DDirectBodyState3D::get_contact_count() const {
+	ERR_FAIL_NULL_V(body, 0);
+	return (int)body->get_contacts().size();
+}
+
+Vector3 Box3DDirectBodyState3D::get_contact_local_position(int p_contact_idx) const {
+	ERR_FAIL_NULL_V(body, Vector3());
+	const LocalVector<Box3DBody3D::Contact> &list = body->get_contacts();
+	ERR_FAIL_INDEX_V(p_contact_idx, (int)list.size(), Vector3());
+	return list[p_contact_idx].local_position;
+}
+
+Vector3 Box3DDirectBodyState3D::get_contact_local_normal(int p_contact_idx) const {
+	ERR_FAIL_NULL_V(body, Vector3());
+	const LocalVector<Box3DBody3D::Contact> &list = body->get_contacts();
+	ERR_FAIL_INDEX_V(p_contact_idx, (int)list.size(), Vector3());
+	return list[p_contact_idx].local_normal;
+}
+
+Vector3 Box3DDirectBodyState3D::get_contact_impulse(int p_contact_idx) const {
+	ERR_FAIL_NULL_V(body, Vector3());
+	const LocalVector<Box3DBody3D::Contact> &list = body->get_contacts();
+	ERR_FAIL_INDEX_V(p_contact_idx, (int)list.size(), Vector3());
+	return list[p_contact_idx].impulse;
+}
+
+int Box3DDirectBodyState3D::get_contact_local_shape(int p_contact_idx) const {
+	ERR_FAIL_NULL_V(body, 0);
+	const LocalVector<Box3DBody3D::Contact> &list = body->get_contacts();
+	ERR_FAIL_INDEX_V(p_contact_idx, (int)list.size(), 0);
+	return list[p_contact_idx].local_shape;
+}
+
+Vector3 Box3DDirectBodyState3D::get_contact_local_velocity_at_position(int p_contact_idx) const {
+	ERR_FAIL_NULL_V(body, Vector3());
+	const LocalVector<Box3DBody3D::Contact> &list = body->get_contacts();
+	ERR_FAIL_INDEX_V(p_contact_idx, (int)list.size(), Vector3());
+	return body->get_velocity_at_local_position(list[p_contact_idx].local_position);
+}
+
+RID Box3DDirectBodyState3D::get_contact_collider(int p_contact_idx) const {
+	ERR_FAIL_NULL_V(body, RID());
+	const LocalVector<Box3DBody3D::Contact> &list = body->get_contacts();
+	ERR_FAIL_INDEX_V(p_contact_idx, (int)list.size(), RID());
+	return list[p_contact_idx].collider;
+}
+
+Vector3 Box3DDirectBodyState3D::get_contact_collider_position(int p_contact_idx) const {
+	ERR_FAIL_NULL_V(body, Vector3());
+	const LocalVector<Box3DBody3D::Contact> &list = body->get_contacts();
+	ERR_FAIL_INDEX_V(p_contact_idx, (int)list.size(), Vector3());
+	return list[p_contact_idx].collider_position;
+}
+
+ObjectID Box3DDirectBodyState3D::get_contact_collider_id(int p_contact_idx) const {
+	ERR_FAIL_NULL_V(body, ObjectID());
+	const LocalVector<Box3DBody3D::Contact> &list = body->get_contacts();
+	ERR_FAIL_INDEX_V(p_contact_idx, (int)list.size(), ObjectID());
+	return list[p_contact_idx].collider_id;
+}
+
+int Box3DDirectBodyState3D::get_contact_collider_shape(int p_contact_idx) const {
+	ERR_FAIL_NULL_V(body, 0);
+	const LocalVector<Box3DBody3D::Contact> &list = body->get_contacts();
+	ERR_FAIL_INDEX_V(p_contact_idx, (int)list.size(), 0);
+	return list[p_contact_idx].collider_shape;
+}
+
+Vector3 Box3DDirectBodyState3D::get_contact_collider_velocity_at_position(int p_contact_idx) const {
+	ERR_FAIL_NULL_V(body, Vector3());
+	const LocalVector<Box3DBody3D::Contact> &list = body->get_contacts();
+	ERR_FAIL_INDEX_V(p_contact_idx, (int)list.size(), Vector3());
+	return list[p_contact_idx].collider_velocity_at_position;
+}

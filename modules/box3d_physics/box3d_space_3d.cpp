@@ -38,6 +38,30 @@
 
 #include "core/os/os.h"
 
+// Honors Godot's per-body collision exceptions, which Box3D's layer/mask filter
+// cannot express: an exception is a pair rule, not a category rule.
+//
+// Box3D only calls this when one of the two shapes set enableCustomFiltering, so a
+// scene without exceptions never reaches it.
+static bool custom_filter_fcn(b3ShapeId p_shape_a, b3ShapeId p_shape_b, void *p_context) {
+	const b3BodyId body_a = b3Shape_GetBody(p_shape_a);
+	const b3BodyId body_b = b3Shape_GetBody(p_shape_b);
+	if (!B3_IS_NON_NULL(body_a) || !B3_IS_NON_NULL(body_b)) {
+		return true;
+	}
+
+	Box3DCollisionObject3D *object_a = static_cast<Box3DCollisionObject3D *>(b3Body_GetUserData(body_a));
+	Box3DCollisionObject3D *object_b = static_cast<Box3DCollisionObject3D *>(b3Body_GetUserData(body_b));
+	if (object_a == nullptr || object_b == nullptr || object_a->is_area() || object_b->is_area()) {
+		return true;
+	}
+
+	// Godot treats the exception as mutual even when only one side declares it.
+	const Box3DBody3D *a = static_cast<Box3DBody3D *>(object_a);
+	const Box3DBody3D *b = static_cast<Box3DBody3D *>(object_b);
+	return !a->has_collision_exception(b->get_self()) && !b->has_collision_exception(a->get_self());
+}
+
 Box3DSpace3D::Box3DSpace3D() {
 	b3WorldDef world_def = b3DefaultWorldDef();
 	world_def.gravity = to_b3(gravity_vector * gravity_magnitude);
@@ -52,6 +76,7 @@ Box3DSpace3D::Box3DSpace3D() {
 	world_def.workerCount = CLAMP(OS::get_singleton()->get_processor_count(), 1, B3_MAX_WORKERS);
 
 	world_id = b3CreateWorld(&world_def);
+	b3World_SetCustomFilterCallback(world_id, custom_filter_fcn, nullptr);
 }
 
 Box3DSpace3D::~Box3DSpace3D() {
@@ -113,6 +138,12 @@ void Box3DSpace3D::step(real_t p_delta) {
 	if (!active || !B3_IS_NON_NULL(world_id)) {
 		return;
 	}
+	// Godot's constant forces are a standing request that Box3D's per-step force
+	// accumulator cannot hold, so they are re-applied immediately before every step.
+	for (Box3DBody3D *body : bodies) {
+		body->apply_constant_forces();
+	}
+
 	b3World_Step(world_id, (float)p_delta, substep_count);
 }
 
