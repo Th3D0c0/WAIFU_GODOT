@@ -216,6 +216,11 @@ Comment: Basis Universal
 Copyright: 2019-2025, Binomial LLC.
 License: Apache-2.0
 
+Files: thirdparty/box3d/*
+Comment: Box3D
+Copyright: 2026, Erin Catto
+License: Expat
+
 Files: thirdparty/brotli/*
 Comment: Brotli
 Copyright: 2009, 2010, 2013-2016 by the Brotli Authors.

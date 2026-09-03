@@ -302,3 +302,4 @@ SCsub                                         @godotengine/buildsystem
 /modules/waifu_test/                          @Th3D0c0
 /modules/projectiles/                         @Th3D0c0
 /modules/limboai                              @Th3D0c0
+/modules/box3d_physics/                       @Th3D0c0

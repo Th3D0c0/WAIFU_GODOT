@@ -1,0 +1,889 @@
+/**************************************************************************/
+/*  box3d_physics_server_3d.cpp                                           */
+/**************************************************************************/
+/*                         This file is part of:                          */
+/*                             GODOT ENGINE                               */
+/*                        https://godotengine.org                         */
+/**************************************************************************/
+/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
+/*                                                                        */
+/* Permission is hereby granted, free of charge, to any person obtaining  */
+/* a copy of this software and associated documentation files (the        */
+/* "Software"), to deal in the Software without restriction, including    */
+/* without limitation the rights to use, copy, modify, merge, publish,    */
+/* distribute, sublicense, and/or sell copies of the Software, and to     */
+/* permit persons to whom the Software is furnished to do so, subject to  */
+/* the following conditions:                                              */
+/*                                                                        */
+/* The above copyright notice and this permission notice shall be         */
+/* included in all copies or substantial portions of the Software.        */
+/*                                                                        */
+/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,        */
+/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF     */
+/* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. */
+/* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY   */
+/* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,   */
+/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE      */
+/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
+/**************************************************************************/
+
+#include "box3d_physics_server_3d.h"
+
+RID Box3DPhysicsServer3D::world_boundary_shape_create() {
+	B3_TODO();
+	return RID();
+}
+
+RID Box3DPhysicsServer3D::separation_ray_shape_create() {
+	B3_TODO();
+	return RID();
+}
+
+RID Box3DPhysicsServer3D::sphere_shape_create() {
+	B3_TODO();
+	return RID();
+}
+
+RID Box3DPhysicsServer3D::box_shape_create() {
+	B3_TODO();
+	return RID();
+}
+
+RID Box3DPhysicsServer3D::capsule_shape_create() {
+	B3_TODO();
+	return RID();
+}
+
+RID Box3DPhysicsServer3D::cylinder_shape_create() {
+	B3_TODO();
+	return RID();
+}
+
+RID Box3DPhysicsServer3D::convex_polygon_shape_create() {
+	B3_TODO();
+	return RID();
+}
+
+RID Box3DPhysicsServer3D::concave_polygon_shape_create() {
+	B3_TODO();
+	return RID();
+}
+
+RID Box3DPhysicsServer3D::heightmap_shape_create() {
+	B3_TODO();
+	return RID();
+}
+
+RID Box3DPhysicsServer3D::custom_shape_create() {
+	B3_TODO();
+	return RID();
+}
+
+void Box3DPhysicsServer3D::shape_set_data(RID, const Variant &) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::shape_set_custom_solver_bias(RID, real_t) {
+	B3_TODO();
+}
+
+PhysicsServer3D::ShapeType Box3DPhysicsServer3D::shape_get_type(RID) const {
+	B3_TODO();
+	return PhysicsServer3D::ShapeType(0);
+}
+
+Variant Box3DPhysicsServer3D::shape_get_data(RID) const {
+	B3_TODO();
+	return Variant();
+}
+
+void Box3DPhysicsServer3D::shape_set_margin(RID, real_t) {
+	B3_TODO();
+}
+
+real_t Box3DPhysicsServer3D::shape_get_margin(RID) const {
+	B3_TODO();
+	return 0;
+}
+
+real_t Box3DPhysicsServer3D::shape_get_custom_solver_bias(RID) const {
+	B3_TODO();
+	return 0;
+}
+
+RID Box3DPhysicsServer3D::space_create() {
+	B3_TODO();
+	return RID();
+}
+
+void Box3DPhysicsServer3D::space_set_active(RID, bool) {
+	B3_TODO();
+}
+
+bool Box3DPhysicsServer3D::space_is_active(RID) const {
+	B3_TODO();
+	return false;
+}
+
+void Box3DPhysicsServer3D::space_set_param(RID, SpaceParameter, real_t) {
+	B3_TODO();
+}
+
+real_t Box3DPhysicsServer3D::space_get_param(RID, SpaceParameter) const {
+	B3_TODO();
+	return 0;
+}
+
+PhysicsDirectSpaceState3D *Box3DPhysicsServer3D::space_get_direct_state(RID) {
+	B3_TODO();
+	return nullptr;
+}
+
+void Box3DPhysicsServer3D::space_set_debug_contacts(RID, int) {
+	B3_TODO();
+}
+
+Vector<Vector3> Box3DPhysicsServer3D::space_get_contacts(RID) const {
+	B3_TODO();
+	return Vector<Vector3>();
+}
+
+int Box3DPhysicsServer3D::space_get_contact_count(RID) const {
+	B3_TODO();
+	return 0;
+}
+
+RID Box3DPhysicsServer3D::area_create() {
+	B3_TODO();
+	return RID();
+}
+
+void Box3DPhysicsServer3D::area_set_space(RID, RID) {
+	B3_TODO();
+}
+
+RID Box3DPhysicsServer3D::area_get_space(RID) const {
+	B3_TODO();
+	return RID();
+}
+
+void Box3DPhysicsServer3D::area_add_shape(RID, RID, const Transform3D &, bool) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::area_set_shape(RID, int, RID) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::area_set_shape_transform(RID, int, const Transform3D &) {
+	B3_TODO();
+}
+
+int Box3DPhysicsServer3D::area_get_shape_count(RID) const {
+	B3_TODO();
+	return 0;
+}
+
+RID Box3DPhysicsServer3D::area_get_shape(RID, int) const {
+	B3_TODO();
+	return RID();
+}
+
+Transform3D Box3DPhysicsServer3D::area_get_shape_transform(RID, int) const {
+	B3_TODO();
+	return Transform3D();
+}
+
+void Box3DPhysicsServer3D::area_remove_shape(RID, int) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::area_clear_shapes(RID) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::area_set_shape_disabled(RID, int, bool) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::area_attach_object_instance_id(RID, ObjectID) {
+	B3_TODO();
+}
+
+ObjectID Box3DPhysicsServer3D::area_get_object_instance_id(RID) const {
+	B3_TODO();
+	return ObjectID();
+}
+
+void Box3DPhysicsServer3D::area_set_param(RID, AreaParameter, const Variant &) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::area_set_transform(RID, const Transform3D &) {
+	B3_TODO();
+}
+
+Variant Box3DPhysicsServer3D::area_get_param(RID, AreaParameter) const {
+	B3_TODO();
+	return Variant();
+}
+
+Transform3D Box3DPhysicsServer3D::area_get_transform(RID) const {
+	B3_TODO();
+	return Transform3D();
+}
+
+void Box3DPhysicsServer3D::area_set_collision_layer(RID, uint32_t) {
+	B3_TODO();
+}
+
+uint32_t Box3DPhysicsServer3D::area_get_collision_layer(RID) const {
+	B3_TODO();
+	return 0;
+}
+
+void Box3DPhysicsServer3D::area_set_collision_mask(RID, uint32_t) {
+	B3_TODO();
+}
+
+uint32_t Box3DPhysicsServer3D::area_get_collision_mask(RID) const {
+	B3_TODO();
+	return 0;
+}
+
+void Box3DPhysicsServer3D::area_set_monitorable(RID, bool) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::area_set_monitor_callback(RID, const Callable &) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::area_set_area_monitor_callback(RID, const Callable &) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::area_set_ray_pickable(RID, bool) {
+	B3_TODO();
+}
+
+RID Box3DPhysicsServer3D::body_create() {
+	B3_TODO();
+	return RID();
+}
+
+void Box3DPhysicsServer3D::body_set_space(RID, RID) {
+	B3_TODO();
+}
+
+RID Box3DPhysicsServer3D::body_get_space(RID) const {
+	B3_TODO();
+	return RID();
+}
+
+void Box3DPhysicsServer3D::body_set_mode(RID, BodyMode) {
+	B3_TODO();
+}
+
+PhysicsServer3D::BodyMode Box3DPhysicsServer3D::body_get_mode(RID) const {
+	B3_TODO();
+	return PhysicsServer3D::BodyMode(0);
+}
+
+void Box3DPhysicsServer3D::body_add_shape(RID, RID, const Transform3D &, bool) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::body_set_shape(RID, int, RID) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::body_set_shape_transform(RID, int, const Transform3D &) {
+	B3_TODO();
+}
+
+int Box3DPhysicsServer3D::body_get_shape_count(RID) const {
+	B3_TODO();
+	return 0;
+}
+
+RID Box3DPhysicsServer3D::body_get_shape(RID, int) const {
+	B3_TODO();
+	return RID();
+}
+
+Transform3D Box3DPhysicsServer3D::body_get_shape_transform(RID, int) const {
+	B3_TODO();
+	return Transform3D();
+}
+
+void Box3DPhysicsServer3D::body_remove_shape(RID, int) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::body_clear_shapes(RID) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::body_set_shape_disabled(RID, int, bool) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::body_attach_object_instance_id(RID, ObjectID) {
+	B3_TODO();
+}
+
+ObjectID Box3DPhysicsServer3D::body_get_object_instance_id(RID) const {
+	B3_TODO();
+	return ObjectID();
+}
+
+void Box3DPhysicsServer3D::body_set_enable_continuous_collision_detection(RID, bool) {
+	B3_TODO();
+}
+
+bool Box3DPhysicsServer3D::body_is_continuous_collision_detection_enabled(RID) const {
+	B3_TODO();
+	return false;
+}
+
+void Box3DPhysicsServer3D::body_set_collision_layer(RID, uint32_t) {
+	B3_TODO();
+}
+
+uint32_t Box3DPhysicsServer3D::body_get_collision_layer(RID) const {
+	B3_TODO();
+	return 0;
+}
+
+void Box3DPhysicsServer3D::body_set_collision_mask(RID, uint32_t) {
+	B3_TODO();
+}
+
+uint32_t Box3DPhysicsServer3D::body_get_collision_mask(RID) const {
+	B3_TODO();
+	return 0;
+}
+
+void Box3DPhysicsServer3D::body_set_collision_priority(RID, real_t) {
+	B3_TODO();
+}
+
+real_t Box3DPhysicsServer3D::body_get_collision_priority(RID) const {
+	B3_TODO();
+	return 0;
+}
+
+void Box3DPhysicsServer3D::body_set_user_flags(RID, uint32_t) {
+	B3_TODO();
+}
+
+uint32_t Box3DPhysicsServer3D::body_get_user_flags(RID) const {
+	B3_TODO();
+	return 0;
+}
+
+void Box3DPhysicsServer3D::body_set_param(RID, BodyParameter, const Variant &) {
+	B3_TODO();
+}
+
+Variant Box3DPhysicsServer3D::body_get_param(RID, BodyParameter) const {
+	B3_TODO();
+	return Variant();
+}
+
+void Box3DPhysicsServer3D::body_reset_mass_properties(RID) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::body_set_state(RID, BodyState, const Variant &) {
+	B3_TODO();
+}
+
+Variant Box3DPhysicsServer3D::body_get_state(RID, BodyState) const {
+	B3_TODO();
+	return Variant();
+}
+
+void Box3DPhysicsServer3D::body_apply_central_impulse(RID, const Vector3 &) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::body_apply_impulse(RID, const Vector3 &, const Vector3 &) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::body_apply_torque_impulse(RID, const Vector3 &) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::body_apply_central_force(RID, const Vector3 &) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::body_apply_force(RID, const Vector3 &, const Vector3 &) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::body_apply_torque(RID, const Vector3 &) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::body_add_constant_central_force(RID, const Vector3 &) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::body_add_constant_force(RID, const Vector3 &, const Vector3 &) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::body_add_constant_torque(RID, const Vector3 &) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::body_set_constant_force(RID, const Vector3 &) {
+	B3_TODO();
+}
+
+Vector3 Box3DPhysicsServer3D::body_get_constant_force(RID) const {
+	B3_TODO();
+	return Vector3();
+}
+
+void Box3DPhysicsServer3D::body_set_constant_torque(RID, const Vector3 &) {
+	B3_TODO();
+}
+
+Vector3 Box3DPhysicsServer3D::body_get_constant_torque(RID) const {
+	B3_TODO();
+	return Vector3();
+}
+
+void Box3DPhysicsServer3D::body_set_axis_velocity(RID, const Vector3 &) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::body_set_axis_lock(RID, BodyAxis, bool) {
+	B3_TODO();
+}
+
+bool Box3DPhysicsServer3D::body_is_axis_locked(RID, BodyAxis) const {
+	B3_TODO();
+	return false;
+}
+
+void Box3DPhysicsServer3D::body_add_collision_exception(RID, RID) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::body_remove_collision_exception(RID, RID) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::body_get_collision_exceptions(RID, List<RID> *) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::body_set_max_contacts_reported(RID, int) {
+	B3_TODO();
+}
+
+int Box3DPhysicsServer3D::body_get_max_contacts_reported(RID) const {
+	B3_TODO();
+	return 0;
+}
+
+void Box3DPhysicsServer3D::body_set_contacts_reported_depth_threshold(RID, real_t) {
+	B3_TODO();
+}
+
+real_t Box3DPhysicsServer3D::body_get_contacts_reported_depth_threshold(RID) const {
+	B3_TODO();
+	return 0;
+}
+
+void Box3DPhysicsServer3D::body_set_omit_force_integration(RID, bool) {
+	B3_TODO();
+}
+
+bool Box3DPhysicsServer3D::body_is_omitting_force_integration(RID) const {
+	B3_TODO();
+	return false;
+}
+
+void Box3DPhysicsServer3D::body_set_state_sync_callback(RID, const Callable &) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::body_set_force_integration_callback(RID, const Callable &, const Variant &) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::body_set_ray_pickable(RID, bool) {
+	B3_TODO();
+}
+
+PhysicsDirectBodyState3D *Box3DPhysicsServer3D::body_get_direct_state(RID) {
+	B3_TODO();
+	return nullptr;
+}
+
+bool Box3DPhysicsServer3D::body_test_motion(RID, const MotionParameters &, MotionResult *r_result) {
+	B3_TODO();
+	return false;
+}
+
+RID Box3DPhysicsServer3D::soft_body_create() {
+	B3_TODO();
+	return RID();
+}
+
+void Box3DPhysicsServer3D::soft_body_update_rendering_server(RID, RequiredParam<PhysicsServer3DRenderingServerHandler> rp_rendering_server_handler) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::soft_body_set_space(RID, RID) {
+	B3_TODO();
+}
+
+RID Box3DPhysicsServer3D::soft_body_get_space(RID) const {
+	B3_TODO();
+	return RID();
+}
+
+void Box3DPhysicsServer3D::soft_body_set_mesh(RID, RID) {
+	B3_TODO();
+}
+
+AABB Box3DPhysicsServer3D::soft_body_get_bounds(RID) const {
+	B3_TODO();
+	return AABB();
+}
+
+void Box3DPhysicsServer3D::soft_body_set_collision_layer(RID, uint32_t) {
+	B3_TODO();
+}
+
+uint32_t Box3DPhysicsServer3D::soft_body_get_collision_layer(RID) const {
+	B3_TODO();
+	return 0;
+}
+
+void Box3DPhysicsServer3D::soft_body_set_collision_mask(RID, uint32_t) {
+	B3_TODO();
+}
+
+uint32_t Box3DPhysicsServer3D::soft_body_get_collision_mask(RID) const {
+	B3_TODO();
+	return 0;
+}
+
+void Box3DPhysicsServer3D::soft_body_add_collision_exception(RID, RID) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::soft_body_remove_collision_exception(RID, RID) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::soft_body_get_collision_exceptions(RID, List<RID> *) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::soft_body_set_state(RID, BodyState, const Variant &) {
+	B3_TODO();
+}
+
+Variant Box3DPhysicsServer3D::soft_body_get_state(RID, BodyState) const {
+	B3_TODO();
+	return Variant();
+}
+
+void Box3DPhysicsServer3D::soft_body_set_transform(RID, const Transform3D &) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::soft_body_set_ray_pickable(RID, bool) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::soft_body_set_simulation_precision(RID, int) {
+	B3_TODO();
+}
+
+int Box3DPhysicsServer3D::soft_body_get_simulation_precision(RID) const {
+	B3_TODO();
+	return 0;
+}
+
+void Box3DPhysicsServer3D::soft_body_set_total_mass(RID, real_t) {
+	B3_TODO();
+}
+
+real_t Box3DPhysicsServer3D::soft_body_get_total_mass(RID) const {
+	B3_TODO();
+	return 0;
+}
+
+void Box3DPhysicsServer3D::soft_body_set_linear_stiffness(RID, real_t) {
+	B3_TODO();
+}
+
+real_t Box3DPhysicsServer3D::soft_body_get_linear_stiffness(RID) const {
+	B3_TODO();
+	return 0;
+}
+
+void Box3DPhysicsServer3D::soft_body_set_shrinking_factor(RID, real_t) {
+	B3_TODO();
+}
+
+real_t Box3DPhysicsServer3D::soft_body_get_shrinking_factor(RID) const {
+	B3_TODO();
+	return 0;
+}
+
+void Box3DPhysicsServer3D::soft_body_set_pressure_coefficient(RID, real_t) {
+	B3_TODO();
+}
+
+real_t Box3DPhysicsServer3D::soft_body_get_pressure_coefficient(RID) const {
+	B3_TODO();
+	return 0;
+}
+
+void Box3DPhysicsServer3D::soft_body_set_damping_coefficient(RID, real_t) {
+	B3_TODO();
+}
+
+real_t Box3DPhysicsServer3D::soft_body_get_damping_coefficient(RID) const {
+	B3_TODO();
+	return 0;
+}
+
+void Box3DPhysicsServer3D::soft_body_set_drag_coefficient(RID, real_t) {
+	B3_TODO();
+}
+
+real_t Box3DPhysicsServer3D::soft_body_get_drag_coefficient(RID) const {
+	B3_TODO();
+	return 0;
+}
+
+void Box3DPhysicsServer3D::soft_body_move_point(RID, int, const Vector3 &) {
+	B3_TODO();
+}
+
+Vector3 Box3DPhysicsServer3D::soft_body_get_point_global_position(RID, int) const {
+	B3_TODO();
+	return Vector3();
+}
+
+void Box3DPhysicsServer3D::soft_body_apply_point_impulse(RID, int, const Vector3 &) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::soft_body_apply_point_force(RID, int, const Vector3 &) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::soft_body_apply_central_impulse(RID, const Vector3 &) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::soft_body_apply_central_force(RID, const Vector3 &) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::soft_body_remove_all_pinned_points(RID) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::soft_body_pin_point(RID, int, bool) {
+	B3_TODO();
+}
+
+bool Box3DPhysicsServer3D::soft_body_is_point_pinned(RID, int) const {
+	B3_TODO();
+	return false;
+}
+
+RID Box3DPhysicsServer3D::joint_create() {
+	B3_TODO();
+	return RID();
+}
+
+void Box3DPhysicsServer3D::joint_clear(RID) {
+	B3_TODO();
+}
+
+PhysicsServer3D::JointType Box3DPhysicsServer3D::joint_get_type(RID) const {
+	B3_TODO();
+	return PhysicsServer3D::JointType(0);
+}
+
+void Box3DPhysicsServer3D::joint_set_solver_priority(RID, int) {
+	B3_TODO();
+}
+
+int Box3DPhysicsServer3D::joint_get_solver_priority(RID) const {
+	B3_TODO();
+	return 0;
+}
+
+void Box3DPhysicsServer3D::joint_disable_collisions_between_bodies(RID, bool) {
+	B3_TODO();
+}
+
+bool Box3DPhysicsServer3D::joint_is_disabled_collisions_between_bodies(RID) const {
+	B3_TODO();
+	return false;
+}
+
+void Box3DPhysicsServer3D::joint_make_pin(RID, RID, const Vector3 &, RID, const Vector3 &) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::pin_joint_set_param(RID, PinJointParam, real_t) {
+	B3_TODO();
+}
+
+real_t Box3DPhysicsServer3D::pin_joint_get_param(RID, PinJointParam) const {
+	B3_TODO();
+	return 0;
+}
+
+void Box3DPhysicsServer3D::pin_joint_set_local_a(RID, const Vector3 &) {
+	B3_TODO();
+}
+
+Vector3 Box3DPhysicsServer3D::pin_joint_get_local_a(RID) const {
+	B3_TODO();
+	return Vector3();
+}
+
+void Box3DPhysicsServer3D::pin_joint_set_local_b(RID, const Vector3 &) {
+	B3_TODO();
+}
+
+Vector3 Box3DPhysicsServer3D::pin_joint_get_local_b(RID) const {
+	B3_TODO();
+	return Vector3();
+}
+
+void Box3DPhysicsServer3D::joint_make_hinge(RID, RID, const Transform3D &, RID, const Transform3D &) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::joint_make_hinge_simple(RID, RID, const Vector3 &, const Vector3 &, RID, const Vector3 &, const Vector3 &) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::hinge_joint_set_param(RID, HingeJointParam, real_t) {
+	B3_TODO();
+}
+
+real_t Box3DPhysicsServer3D::hinge_joint_get_param(RID, HingeJointParam) const {
+	B3_TODO();
+	return 0;
+}
+
+void Box3DPhysicsServer3D::hinge_joint_set_flag(RID, HingeJointFlag, bool) {
+	B3_TODO();
+}
+
+bool Box3DPhysicsServer3D::hinge_joint_get_flag(RID, HingeJointFlag) const {
+	B3_TODO();
+	return false;
+}
+
+void Box3DPhysicsServer3D::joint_make_slider(RID, RID, const Transform3D &, RID, const Transform3D &) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::slider_joint_set_param(RID, SliderJointParam, real_t) {
+	B3_TODO();
+}
+
+real_t Box3DPhysicsServer3D::slider_joint_get_param(RID, SliderJointParam) const {
+	B3_TODO();
+	return 0;
+}
+
+void Box3DPhysicsServer3D::joint_make_cone_twist(RID, RID, const Transform3D &, RID, const Transform3D &) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::cone_twist_joint_set_param(RID, ConeTwistJointParam, real_t) {
+	B3_TODO();
+}
+
+real_t Box3DPhysicsServer3D::cone_twist_joint_get_param(RID, ConeTwistJointParam) const {
+	B3_TODO();
+	return 0;
+}
+
+void Box3DPhysicsServer3D::joint_make_generic_6dof(RID, RID, const Transform3D &, RID, const Transform3D &) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::generic_6dof_joint_set_param(RID, Vector3::Axis, G6DOFJointAxisParam, real_t) {
+	B3_TODO();
+}
+
+real_t Box3DPhysicsServer3D::generic_6dof_joint_get_param(RID, Vector3::Axis, G6DOFJointAxisParam) const {
+	B3_TODO();
+	return 0;
+}
+
+void Box3DPhysicsServer3D::generic_6dof_joint_set_flag(RID, Vector3::Axis, G6DOFJointAxisFlag, bool) {
+	B3_TODO();
+}
+
+bool Box3DPhysicsServer3D::generic_6dof_joint_get_flag(RID, Vector3::Axis, G6DOFJointAxisFlag) const {
+	B3_TODO();
+	return false;
+}
+
+void Box3DPhysicsServer3D::free_rid(RID) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::set_active(bool) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::init() {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::step(real_t) {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::sync() {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::flush_queries() {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::end_sync() {
+	B3_TODO();
+}
+
+void Box3DPhysicsServer3D::finish() {
+	B3_TODO();
+}
+
+bool Box3DPhysicsServer3D::is_flushing_queries() const {
+	B3_TODO();
+	return false;
+}
+
+int Box3DPhysicsServer3D::get_process_info(ProcessInfo) {
+	B3_TODO();
+	return 0;
+}

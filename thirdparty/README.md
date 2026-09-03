@@ -93,6 +93,20 @@ Patches:
 - `0006-explicit-includes.patch` ([GH-111557](https://github.com/godotengine/godot/pull/111557))
 
 
+## box3d
+
+- Upstream: https://github.com/erincatto/box3d
+- Version: 0.1.0 (8441b4a06d6d09dcfb0b0f704df4d847d1437b92, 2026)
+- License: MIT
+
+Files extracted from upstream source:
+
+- All files in `include/` and `src/`, except `src/CMakeLists.txt`
+- `LICENSE`
+
+Patches:
+
+
 ## brotli
 
 - Upstream: https://github.com/google/brotli
