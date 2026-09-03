@@ -37,6 +37,15 @@ b3QueryFilter box3d_make_query_filter(uint32_t p_collision_mask) {
 	return filter;
 }
 
+b3Filter box3d_make_shape_filter(uint32_t p_collision_layer, uint32_t p_collision_mask) {
+	b3Filter filter = b3DefaultFilter();
+	filter.categoryBits = (uint64_t)p_collision_layer | B3_GODOT_PAIR_BIT;
+	// Deliberately permissive: the real pair rule is Godot's OR, which lives in the
+	// world's custom filter callback. See the note in the header.
+	filter.maskBits = UINT64_MAX;
+	return filter;
+}
+
 Box3DCollisionObject3D *Box3DQueryContext::resolve(b3ShapeId p_shape) const {
 	if (!b3Shape_IsValid(p_shape)) {
 		return nullptr;

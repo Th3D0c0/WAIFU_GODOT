@@ -33,6 +33,7 @@
 #include "box3d_conversions.h"
 #include "box3d_direct_body_state_3d.h"
 #include "box3d_joint_3d.h"
+#include "box3d_query_3d.h"
 #include "box3d_space_3d.h"
 
 #include "core/error/error_macros.h"
@@ -145,17 +146,19 @@ void Box3DBody3D::_rebuild_shapes() {
 		shape_def.density = 1.0f;
 		shape_def.baseMaterial.friction = (float)friction;
 		shape_def.baseMaterial.restitution = (float)bounce;
-		shape_def.filter.categoryBits = collision_layer;
-		shape_def.filter.maskBits = collision_mask;
+		shape_def.filter = box3d_make_shape_filter(collision_layer, collision_mask);
 		shape_def.userData = this;
 		// A sensor only reports a visitor whose own shape has sensor events enabled -
 		// the flag applies to both sides and is false by default (types.h:489). Without
 		// this every Area3D in the scene silently detects nothing.
 		shape_def.enableSensorEvents = true;
 		// Box3D only consults the world's custom filter when one of the two shapes asks
-		// for it (types.h:68), so this is switched on per body rather than globally -
-		// a scene with no collision exceptions pays nothing for the mechanism.
-		shape_def.enableCustomFiltering = !collision_exceptions.is_empty();
+		// for it (types.h:68), and that callback is where Godot's layer rule and its
+		// collision exceptions both live - neither is expressible in the filter bits.
+		// So this is not optional and not conditional: a shape without it collides with
+		// everything its AABB touches, because box3d_make_shape_filter deliberately
+		// leaves the cheap bit test unable to reject anything.
+		shape_def.enableCustomFiltering = true;
 		// Deferred so a body with several shapes recomputes its mass once, below.
 		shape_def.updateBodyMass = false;
 

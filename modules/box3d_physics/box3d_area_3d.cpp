@@ -31,6 +31,7 @@
 #include "box3d_area_3d.h"
 
 #include "box3d_conversions.h"
+#include "box3d_query_3d.h"
 #include "box3d_space_3d.h"
 
 #include "core/error/error_macros.h"
@@ -104,8 +105,12 @@ void Box3DArea3D::_rebuild_shapes() {
 		// A sensor with mass would drag the kinematic body's inertia around for no
 		// reason; areas are volumes, not matter.
 		shape_def.density = 0.0f;
-		shape_def.filter.categoryBits = collision_layer;
-		shape_def.filter.maskBits = collision_mask;
+		shape_def.filter = box3d_make_shape_filter(collision_layer, collision_mask);
+		// Godot's layer rule is an OR and Box3D's filter bits can only express an AND,
+		// so the shape filter above is permissive by construction and the real test runs
+		// in the world's custom filter. Without this flag Box3D never calls it and the
+		// area reports every body whose AABB it touches, whatever the layers say.
+		shape_def.enableCustomFiltering = true;
 		shape_def.userData = this;
 		shape_def.updateBodyMass = false;
 

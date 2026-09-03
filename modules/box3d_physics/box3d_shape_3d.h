@@ -100,7 +100,25 @@ public:
 
 	void set_type(Type p_type) { type = p_type; }
 	Type get_type() const { return type; }
-	bool is_valid() const { return type != TYPE_UNSUPPORTED; }
+	// True when this shape can actually be baked into Box3D geometry.
+	//
+	// A supported type is not enough. Godot creates a shape RID first and sets its data
+	// afterwards, so between those two calls a shape legitimately exists with no
+	// geometry at all - and it is already attached to a body by then, because
+	// CollisionShape3D adds the shape before the resource has computed itself. A
+	// CSGShape3D or a runtime-generated ConcavePolygonShape3D can also be handed an
+	// empty face array and filled in on a later frame.
+	//
+	// So an empty shape is a transient state to skip, not an error to report: the
+	// dependent rebuild triggered by shape_set_data is what brings it in once the data
+	// lands. Treating it as valid instead means trying to bake a mesh with no triangles
+	// on every such shape during scene setup.
+	bool is_valid() const { return type != TYPE_UNSUPPORTED && has_usable_data(); }
+
+	// Whether the geometry this shape describes is non-degenerate. Split out from
+	// is_valid() so the distinction between "unsupported type" and "not filled in yet"
+	// stays readable at the call sites that care.
+	bool has_usable_data() const;
 
 	// Concave geometry can only ever collide as a static body: b3CreateMeshShape is
 	// documented as only creating contacts on static bodies, exactly as Godot's own

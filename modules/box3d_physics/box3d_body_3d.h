@@ -95,8 +95,6 @@ private:
 	real_t gravity_scale = 1.0;
 	real_t friction = 1.0;
 	real_t bounce = 0.0;
-	uint32_t collision_layer = 1;
-	uint32_t collision_mask = 1;
 	bool ccd_enabled = false;
 	bool sleep_allowed = true;
 	bool ray_pickable = true;
@@ -158,10 +156,9 @@ public:
 	void set_param(PhysicsServer3D::BodyParameter p_param, const Variant &p_value);
 	Variant get_param(PhysicsServer3D::BodyParameter p_param) const;
 
+	// Getters are inherited from Box3DCollisionObject3D; the setters rebuild.
 	void set_collision_layer(uint32_t p_layer);
-	uint32_t get_collision_layer() const { return collision_layer; }
 	void set_collision_mask(uint32_t p_mask);
-	uint32_t get_collision_mask() const { return collision_mask; }
 
 	void set_ccd_enabled(bool p_enabled);
 	bool is_ccd_enabled() const { return ccd_enabled; }

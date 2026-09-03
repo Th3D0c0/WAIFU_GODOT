@@ -57,6 +57,11 @@ protected:
 	RID self;
 	ObjectID instance_id;
 
+	// Godot's layer/mask live here rather than on the subclasses because the pair
+	// filter has to read them off either kind of object without knowing which it is.
+	uint32_t collision_layer = 1;
+	uint32_t collision_mask = 1;
+
 	explicit Box3DCollisionObject3D(Type p_type) :
 			type(p_type) {}
 
@@ -69,6 +74,9 @@ public:
 
 	void set_instance_id(ObjectID p_id) { instance_id = p_id; }
 	ObjectID get_instance_id() const { return instance_id; }
+
+	uint32_t get_collision_layer() const { return collision_layer; }
+	uint32_t get_collision_mask() const { return collision_mask; }
 
 	~Box3DCollisionObject3D() {}
 };

@@ -35,14 +35,26 @@
 #include "box3d_conversions.h"
 #include "box3d_direct_body_state_3d.h"
 #include "box3d_direct_space_state_3d.h"
+#include "box3d_query_3d.h"
 
 #include "core/os/os.h"
 
-// Honors Godot's per-body collision exceptions, which Box3D's layer/mask filter
-// cannot express: an exception is a pair rule, not a category rule.
+// The whole of Godot's pair rule, because none of it fits in Box3D's filter bits.
 //
-// Box3D only calls this when one of the two shapes set enableCustomFiltering, so a
-// scene without exceptions never reaches it.
+// Two separate things are decided here:
+//
+//   - The layer/mask test, which is an OR in Godot and an AND in Box3D. The bit filter
+//     built by box3d_make_shape_filter is deliberately permissive so that it cannot
+//     reject a pair this OR would accept, which makes this callback the only place the
+//     rule is actually enforced. See the note in box3d_query_3d.h.
+//   - Collision exceptions, which are a pair rule rather than a category rule and so
+//     have no bit-level expression at all.
+//
+// Box3D consults this from all three paths that create contacts - broad-phase pair
+// creation, sensor overlap and the CCD path in the solver - and only when one of the
+// two shapes set `enableCustomFiltering`, which every shape this backend builds does.
+// It is therefore on the hot path for pair creation, so it stays a couple of loads and
+// a bitwise test in the common case.
 static bool custom_filter_fcn(b3ShapeId p_shape_a, b3ShapeId p_shape_b, void *p_context) {
 	const b3BodyId body_a = b3Shape_GetBody(p_shape_a);
 	const b3BodyId body_b = b3Shape_GetBody(p_shape_b);
@@ -52,7 +64,19 @@ static bool custom_filter_fcn(b3ShapeId p_shape_a, b3ShapeId p_shape_b, void *p_
 
 	Box3DCollisionObject3D *object_a = static_cast<Box3DCollisionObject3D *>(b3Body_GetUserData(body_a));
 	Box3DCollisionObject3D *object_b = static_cast<Box3DCollisionObject3D *>(b3Body_GetUserData(body_b));
-	if (object_a == nullptr || object_b == nullptr || object_a->is_area() || object_b->is_area()) {
+	if (object_a == nullptr || object_b == nullptr) {
+		return true;
+	}
+
+	// Applies to bodies and areas alike - an Area3D filters by layer and mask exactly
+	// as a body does, and area-to-area monitoring goes through here too.
+	if (!box3d_layers_should_collide(object_a->get_collision_layer(), object_a->get_collision_mask(),
+				object_b->get_collision_layer(), object_b->get_collision_mask())) {
+		return false;
+	}
+
+	// Exceptions are a body-only concept; an area has none to declare.
+	if (object_a->is_area() || object_b->is_area()) {
 		return true;
 	}
 

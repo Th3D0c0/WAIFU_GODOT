@@ -72,6 +72,38 @@ void Box3DShape3D::set_data(const Variant &p_data) {
 	}
 }
 
+bool Box3DShape3D::has_usable_data() const {
+	switch (type) {
+		case TYPE_SPHERE: {
+			return radius > 0;
+		}
+
+		case TYPE_BOX: {
+			return half_extents.x > 0 && half_extents.y > 0 && half_extents.z > 0;
+		}
+
+		case TYPE_CAPSULE:
+		case TYPE_CYLINDER: {
+			return radius > 0 && height > 0;
+		}
+
+		case TYPE_CONVEX: {
+			// Fewer than four points cannot enclose a volume, so b3CreateHull would fail.
+			return points.size() >= 4;
+		}
+
+		case TYPE_CONCAVE: {
+			// A triangle soup, so a whole number of triangles and at least one of them.
+			return faces.size() >= 3 && faces.size() % 3 == 0;
+		}
+
+		case TYPE_UNSUPPORTED: {
+			return false;
+		}
+	}
+	return false;
+}
+
 b3ShapeId Box3DShape3D::instantiate(b3BodyId p_body, const b3ShapeDef &p_def, const Transform3D &p_transform,
 		b3HullData **r_owned_hull, b3MeshData **r_owned_mesh) const {
 	*r_owned_hull = nullptr;
@@ -153,7 +185,19 @@ b3ShapeId Box3DShape3D::instantiate(b3BodyId p_body, const b3ShapeDef &p_def, co
 			indices.resize(face_count);
 			for (int i = 0; i < face_count; i++) {
 				vertices[i] = to_b3(p_transform.xform(faces[i]));
-				indices[i] = i;
+			}
+			// Godot and Box3D wind their triangles in opposite directions, and both
+			// engines cull back faces on a mesh raycast, so passing the winding through
+			// unchanged makes every concave surface solid from the wrong side: a ray
+			// dropped onto a floor misses it and hits whatever is underneath, while a
+			// ray from below reports a hit. Reversing the last two indices of each
+			// triangle flips the face normals to Godot's convention and nothing else -
+			// the vertices are untouched, so the geometry is identical.
+			for (int t = 0; t < face_count / 3; t++) {
+				const int base = t * 3;
+				indices[base + 0] = base + 0;
+				indices[base + 1] = base + 2;
+				indices[base + 2] = base + 1;
 			}
 
 			// Box3D ships no b3DefaultMeshDef, so the struct is zero-initialised and

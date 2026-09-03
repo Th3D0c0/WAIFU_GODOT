@@ -59,3 +59,39 @@ struct Box3DQueryContext {
 // to hit anything whose layer intersects it, so the query presents itself as belonging
 // to every category and the shape's own mask is left out of the test.
 b3QueryFilter box3d_make_query_filter(uint32_t p_collision_mask);
+
+// Godot's and Box3D's layer rules are not the same rule, and the difference is not a
+// tuning detail - it decides whether the scene collides at all.
+//
+//   Godot and Jolt:  (maskA & layerB) != 0 || (maskB & layerA) != 0
+//   Box3D:           (maskA & catB)   != 0 && (catA & maskB)   != 0
+//
+// Godot's is an OR: one object scanning the other is enough. Box3D's is an AND: both
+// have to opt in. So a floor on layer 1 / mask 1 and a crate on layer 2 / mask 7
+// collide under Godot - the crate scans the floor - and silently do not under Box3D.
+// Almost every Godot project is authored that way, with static geometry left on the
+// default layer and each moving object masking what it cares about, so the AND rule
+// drops the ground out from under the whole scene.
+//
+// No assignment of category and mask bits can turn Box3D's AND into Godot's OR, so the
+// real test moves into the world's custom filter callback and the bit filter is reduced
+// to something that can never reject a pair the OR rule would accept.
+//
+// That leaves one conflict. Box3D uses `categoryBits` for two different jobs: the pair
+// test above and `b3ShouldQueryCollide`, where a shape is hit when its category
+// intersects the query's mask - which is exactly Godot's query rule and must keep
+// working. So the category cannot simply be widened. Instead it keeps the Godot layer
+// and gains one reserved bit that no query mask can contain, because Godot masks are
+// 32-bit and this bit is the 64th. The pair test then always passes and defers to the
+// callback, while queries keep matching on the low 32 bits alone.
+constexpr uint64_t B3_GODOT_PAIR_BIT = (uint64_t)1 << 63;
+
+// The shape-side filter: the Godot layer plus the reserved bit, and a mask of all ones
+// so Box3D's AND test cannot reject anything. Every shape built with this must also set
+// `enableCustomFiltering`, or the pair rule is never applied and everything collides.
+b3Filter box3d_make_shape_filter(uint32_t p_collision_layer, uint32_t p_collision_mask);
+
+// Godot's actual pair rule, applied from the custom filter callback.
+_FORCE_INLINE_ bool box3d_layers_should_collide(uint32_t p_layer_a, uint32_t p_mask_a, uint32_t p_layer_b, uint32_t p_mask_b) {
+	return (p_mask_a & p_layer_b) != 0 || (p_mask_b & p_layer_a) != 0;
+}
