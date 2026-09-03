@@ -98,6 +98,15 @@ jobs:
           find . -name window_wrapper.h -not -path './.git/*' 2>/dev/null | head
           echo "--- editor dir summary ---"
           echo "editor/ entries: $(ls editor 2>/dev/null | wc -l)"
+          echo "--- can clang itself resolve it with -I. from this cwd? ---"
+          echo '#include "editor/gui/window_wrapper.h"' > /tmp/inc_probe.cpp
+          echo 'int main() { return 0; }' >> /tmp/inc_probe.cpp
+          # Only the first diagnostic matters: "file not found" means resolution failed,
+          # anything else means clang opened it and choked on its contents, which is
+          # expected without the rest of Godot's headers and defines.
+          clang++ -I. -fsyntax-only /tmp/inc_probe.cpp 2>&1 | head -3
+          echo "--- and with the exact quoted-include semantics from that directory ---"
+          cd modules/limboai/compat && clang++ -I../../.. -fsyntax-only /tmp/inc_probe.cpp 2>&1 | head -3; cd - >/dev/null
 
       - name: Compilation (x86_64)
         uses: ./.github/actions/godot-build
