@@ -243,8 +243,33 @@ excursion and returns to its equilibrium pose exactly.
   shape creation, the `space_*_contacts` debug hooks, `body_*_user_flags`,
   `body_set_force_integration_callback` and `shape_*_custom_solver_bias`.
 
-What has *not* been measured yet is the thing the experiment exists to answer:
-performance against Jolt. The rig matching is a correctness result, not a timing one.
+### First performance numbers
+
+`Tools/box3d/bench.gd` samples 900 physics ticks of `main.tscn` after a 2 s settle,
+five runs per backend, on a plain `target=editor` build:
+
+| | Box3D | Jolt | Box3D advantage |
+|---|---|---|---|
+| wall clock per tick | 1.702 ms | 1.903 ms | 0.201 ms (10.6%) |
+| `TIME_PHYSICS_PROCESS` | 1.455 ms | 1.874 ms | 0.419 ms (22.3%) |
+
+The two backends' five-run ranges do not overlap on either metric — Box3D's worst run
+beats Jolt's best on both — so the ordering is real rather than noise. Against the
+11.1 ms frame budget it is worth roughly 2-4% of a frame.
+
+Four things have to be said about that number before anyone leans on it:
+
+- **Run it with `--fixed-fps 90`.** Headless still paces the main loop to real time
+  otherwise, so wall time comes back as 11.1 ms per tick on both backends — that is the
+  tick rate being measured, not the physics.
+- **Never measure on a `dev_build`.** The same scene reports 6.6 ms against 7.0 ms
+  there, three times the real cost, because of asserts and lost optimization.
+- **Most of the tick is GDScript**, not physics — LimboAI trees, navigation and NPC
+  state machines. That cost is identical under both backends, so it cancels in the
+  difference but makes any ratio taken from the absolute numbers far too flattering.
+- **The scene is close to idle.** The rig has settled and two NPCs are walking; nothing
+  here is a stress test, and Box3D is still missing `collide_shape` and per-area gravity
+  overrides, both of which cost time once implemented.
 
 Four Box3D behaviors that are not guessable from the headers and cost a debug cycle
 each if rediscovered:
