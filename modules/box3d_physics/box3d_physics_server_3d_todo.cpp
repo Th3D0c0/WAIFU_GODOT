@@ -276,30 +276,3 @@ bool Box3DPhysicsServer3D::soft_body_is_point_pinned(RID, int) const {
 	B3_TODO();
 	return false;
 }
-
-void Box3DPhysicsServer3D::pin_joint_set_param(RID, PinJointParam, real_t) {
-	B3_TODO();
-}
-
-real_t Box3DPhysicsServer3D::pin_joint_get_param(RID, PinJointParam) const {
-	B3_TODO();
-	return 0;
-}
-
-void Box3DPhysicsServer3D::pin_joint_set_local_a(RID, const Vector3 &) {
-	B3_TODO();
-}
-
-Vector3 Box3DPhysicsServer3D::pin_joint_get_local_a(RID) const {
-	B3_TODO();
-	return Vector3();
-}
-
-void Box3DPhysicsServer3D::pin_joint_set_local_b(RID, const Vector3 &) {
-	B3_TODO();
-}
-
-Vector3 Box3DPhysicsServer3D::pin_joint_get_local_b(RID) const {
-	B3_TODO();
-	return Vector3();
-}

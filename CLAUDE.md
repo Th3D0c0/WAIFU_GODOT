@@ -224,7 +224,7 @@ absorbs a 6 N s impulse with a 0.104 m peak excursion and returns to its equilib
 pose exactly. Areas, contact reporting, `body_test_motion` and the remaining queries
 are still stubs — run a scene and `B3_TODO()` names them.
 
-Three Box3D behaviors that are not guessable from the headers and cost a debug cycle
+Four Box3D behaviors that are not guessable from the headers and cost a debug cycle
 each if rediscovered:
 
 - **`b3CreateCylinder` is base-anchored**, spanning `y` in `[yOffset, yOffset+height]`
@@ -238,6 +238,15 @@ each if rediscovered:
 - **Vertex welding is skipped unless `weldTolerance > 0`** (`mesh.c:1579`), so setting
   `weldVertices = true` alone does nothing and the internal-edge handling that depends
   on it never engages.
+- **Box3D winds its triangles opposite to Godot, and both engines cull back faces on a
+  mesh raycast.** Passing Godot's winding through unchanged makes every concave surface
+  solid from the wrong side: a ray dropped onto a floor misses it and hits whatever is
+  below, while a ray from underneath reports a hit. `Box3DShape3D::instantiate` swaps
+  the last two indices of each triangle to correct it. This is invisible in resting
+  contact — a body still lands on a mesh floor either way, which is why it survived the
+  first round of testing — and shows up only in queries. The A/B that pins it down is
+  `Tools/box3d/csg_probe.gd` in `Project_WAIFU`: a quad and its mirror, ray-tested under
+  both backends, where every case is exactly inverted between them.
 
 ### Joints, and what the 6DOF mapping can and cannot do
 
@@ -264,6 +273,13 @@ Three things about that mapping are worth knowing before tuning a hand against i
   dynamic endpoint. For the angular case the true relation needs the inertia tensor
   about the joint axis, so mass stands in for it and the angular frequency is only
   approximate - the main reason a tuned Jolt hand will not feel identical here.
+- **Godot's spring damping is a coefficient, Box3D's is a damping ratio**, related by
+  `c = 2*zeta*sqrt(k*m)`. Handing the coefficient over as if it were the ratio is not a
+  small error: the rig authors critical damping as values in the thousands, which read
+  as a ratio is a wildly overdamped spring that creeps to its target over seconds. It
+  presents as a spring that is too *weak*, not one that is too damped, which is what
+  makes it worth naming. `_damping_to_ratio` divides it back out against the same
+  stiffness and mass the frequency came from.
 
 Two axis conventions differ and are converted rather than assumed:
 

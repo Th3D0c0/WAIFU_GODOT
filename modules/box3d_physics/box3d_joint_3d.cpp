@@ -65,10 +65,7 @@ real_t Box3DJoint3D::_collapse_max(const Vector3 &p_value) {
 	return MAX(p_value.x, MAX(p_value.y, p_value.z));
 }
 
-real_t Box3DJoint3D::_stiffness_to_hertz(real_t p_stiffness, bool p_angular) const {
-	if (p_stiffness <= 0) {
-		return 0;
-	}
+real_t Box3DJoint3D::_driven_mass() const {
 	// Pick whichever endpoint actually moves. If both are dynamic the lighter one
 	// dominates the reduced mass, so it is the conservative choice for stability.
 	real_t inertia = 0;
@@ -82,6 +79,36 @@ real_t Box3DJoint3D::_stiffness_to_hertz(real_t p_stiffness, bool p_angular) con
 			inertia = m;
 		}
 	}
+	return inertia;
+}
+
+// Godot's spring damping is a coefficient - newton-seconds per meter for a linear
+// axis, newton-meter-seconds per radian for an angular one - while Box3D's is the
+// dimensionless damping ratio zeta, where 1 is critical. The two are related by
+// c = 2 * zeta * sqrt(k * m), so the coefficient has to be divided back out against
+// the same stiffness and mass the frequency was derived from.
+//
+// Handing the raw coefficient over as if it were a ratio is not a small error: a rig
+// authored for critical damping carries values in the thousands, which as a ratio is
+// an enormously overdamped spring that creeps toward its target over seconds instead
+// of snapping to it. That looks like a spring that is too weak rather than one that is
+// too damped, which is what makes it worth naming here.
+real_t Box3DJoint3D::_damping_to_ratio(real_t p_damping, real_t p_stiffness) const {
+	if (p_damping <= 0 || p_stiffness <= 0) {
+		return 0;
+	}
+	const real_t inertia = _driven_mass();
+	if (inertia <= 0) {
+		return 0;
+	}
+	return p_damping / (2 * Math::sqrt(p_stiffness * inertia));
+}
+
+real_t Box3DJoint3D::_stiffness_to_hertz(real_t p_stiffness, bool p_angular) const {
+	if (p_stiffness <= 0) {
+		return 0;
+	}
+	const real_t inertia = _driven_mass();
 	if (inertia <= 0) {
 		return 0;
 	}
@@ -125,8 +152,9 @@ void Box3DJoint3D::_build_motor_joint(b3WorldId p_world) {
 			g6dof_flags[2][PhysicsServer3D::G6DOF_JOINT_FLAG_ENABLE_ANGULAR_SPRING];
 
 	if (linear_spring) {
-		def.linearHertz = (float)_stiffness_to_hertz(_collapse_max(g6dof_linear_spring_stiffness), false);
-		def.linearDampingRatio = (float)_collapse_max(g6dof_linear_spring_damping);
+		const real_t linear_stiffness = _collapse_max(g6dof_linear_spring_stiffness);
+		def.linearHertz = (float)_stiffness_to_hertz(linear_stiffness, false);
+		def.linearDampingRatio = (float)_damping_to_ratio(_collapse_max(g6dof_linear_spring_damping), linear_stiffness);
 		def.maxSpringForce = FLT_MAX;
 	} else {
 		// Hertz zero is Box3D's "rigid" setting, which is what a 6DOF axis with no
@@ -135,8 +163,9 @@ void Box3DJoint3D::_build_motor_joint(b3WorldId p_world) {
 	}
 
 	if (angular_spring) {
-		def.angularHertz = (float)_stiffness_to_hertz(_collapse_max(g6dof_angular_spring_stiffness), true);
-		def.angularDampingRatio = (float)_collapse_max(g6dof_angular_spring_damping);
+		const real_t angular_stiffness = _collapse_max(g6dof_angular_spring_stiffness);
+		def.angularHertz = (float)_stiffness_to_hertz(angular_stiffness, true);
+		def.angularDampingRatio = (float)_damping_to_ratio(_collapse_max(g6dof_angular_spring_damping), angular_stiffness);
 		def.maxSpringTorque = FLT_MAX;
 	} else {
 		def.angularHertz = 0.0f;
@@ -356,6 +385,66 @@ void Box3DJoint3D::set_collide_connected(bool p_collide) {
 
 void Box3DJoint3D::bodies_changed() {
 	_build();
+}
+
+/* PIN */
+
+namespace {
+// Godot's own defaults for the three pin parameters, from PinJoint3D. Reported back
+// verbatim because nothing here is configurable.
+constexpr real_t PIN_DEFAULT_BIAS = 0.3;
+constexpr real_t PIN_DEFAULT_DAMPING = 1.0;
+constexpr real_t PIN_DEFAULT_IMPULSE_CLAMP = 0.0;
+} // namespace
+
+void Box3DJoint3D::set_pin_local_a(const Vector3 &p_local_a) {
+	frame_a = Transform3D(Basis(), p_local_a);
+	// An anchor is baked into the constraint at creation, so moving one means building
+	// a new constraint rather than adjusting the existing one.
+	_build();
+}
+
+void Box3DJoint3D::set_pin_local_b(const Vector3 &p_local_b) {
+	frame_b = Transform3D(Basis(), p_local_b);
+	_build();
+}
+
+void Box3DJoint3D::set_pin_param(PhysicsServer3D::PinJointParam p_param, real_t p_value) {
+	// Warn only when the value would actually mean something. Godot's PinJoint3D pushes
+	// all three parameters on every joint it creates, so warning unconditionally would
+	// fire on scenes that never touched them.
+	switch (p_param) {
+		case PhysicsServer3D::PIN_JOINT_BIAS: {
+			if (!Math::is_equal_approx(p_value, PIN_DEFAULT_BIAS)) {
+				WARN_PRINT_ONCE("Box3D: pin joint bias is not supported; the value is ignored.");
+			}
+		} break;
+		case PhysicsServer3D::PIN_JOINT_DAMPING: {
+			if (!Math::is_equal_approx(p_value, PIN_DEFAULT_DAMPING)) {
+				WARN_PRINT_ONCE("Box3D: pin joint damping is not supported; the value is ignored.");
+			}
+		} break;
+		case PhysicsServer3D::PIN_JOINT_IMPULSE_CLAMP: {
+			if (!Math::is_equal_approx(p_value, PIN_DEFAULT_IMPULSE_CLAMP)) {
+				WARN_PRINT_ONCE("Box3D: pin joint impulse clamp is not supported; the value is ignored.");
+			}
+		} break;
+		default:
+			break;
+	}
+}
+
+real_t Box3DJoint3D::get_pin_param(PhysicsServer3D::PinJointParam p_param) const {
+	switch (p_param) {
+		case PhysicsServer3D::PIN_JOINT_BIAS:
+			return PIN_DEFAULT_BIAS;
+		case PhysicsServer3D::PIN_JOINT_DAMPING:
+			return PIN_DEFAULT_DAMPING;
+		case PhysicsServer3D::PIN_JOINT_IMPULSE_CLAMP:
+			return PIN_DEFAULT_IMPULSE_CLAMP;
+		default:
+			return 0;
+	}
 }
 
 /* GENERIC 6DOF */

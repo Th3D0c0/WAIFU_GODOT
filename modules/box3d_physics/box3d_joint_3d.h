@@ -119,10 +119,17 @@ private:
 	// on its softest axis, which is the less surprising failure.
 	static real_t _collapse_max(const Vector3 &p_value);
 
+	// The mass the spring is actually working against: the lighter dynamic endpoint.
+	// Both conversions below need it, which is why neither can happen at set time.
+	real_t _driven_mass() const;
+
 	// Godot's spring parameter is a stiffness k, Box3D's is a frequency in hertz.
 	// f = sqrt(k/m) / 2*pi is the exact relation, so the conversion needs the driven
 	// body's mass - which is why it happens at build time rather than at set time.
 	real_t _stiffness_to_hertz(real_t p_stiffness, bool p_angular) const;
+
+	// Godot's damping is a coefficient, Box3D's is a damping ratio: zeta = c / 2*sqrt(k*m).
+	real_t _damping_to_ratio(real_t p_damping, real_t p_stiffness) const;
 
 public:
 	void set_self(const RID &p_self) { self = p_self; }
@@ -142,6 +149,21 @@ public:
 	bool is_collide_connected() const { return collide_connected; }
 	void set_solver_priority(int p_priority) { solver_priority = p_priority; }
 	int get_solver_priority() const { return solver_priority; }
+
+	// A pin's anchors are the whole of its geometry - there is no frame basis to
+	// speak of - so these replace the translation and leave the identity basis alone.
+	void set_pin_local_a(const Vector3 &p_local_a);
+	Vector3 get_pin_local_a() const { return frame_a.origin; }
+	void set_pin_local_b(const Vector3 &p_local_b);
+	Vector3 get_pin_local_b() const { return frame_b.origin; }
+
+	// Bias, damping and impulse clamp describe Bullet's sequential-impulse solver and
+	// have no counterpart in Box3D's soft-constraint solver, so nothing is stored:
+	// the getter reports Godot's default and the setter warns only when a value that
+	// would actually change behavior is asked for. This is what the Jolt backend does
+	// with the same three parameters.
+	void set_pin_param(PhysicsServer3D::PinJointParam p_param, real_t p_value);
+	real_t get_pin_param(PhysicsServer3D::PinJointParam p_param) const;
 
 	void set_g6dof_param(Vector3::Axis p_axis, PhysicsServer3D::G6DOFJointAxisParam p_param, real_t p_value);
 	real_t get_g6dof_param(Vector3::Axis p_axis, PhysicsServer3D::G6DOFJointAxisParam p_param) const;

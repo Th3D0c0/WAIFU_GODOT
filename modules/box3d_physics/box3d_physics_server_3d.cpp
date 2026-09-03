@@ -727,6 +727,42 @@ bool Box3DPhysicsServer3D::generic_6dof_joint_get_flag(RID p_joint, Vector3::Axi
 	return joint->get_g6dof_flag(p_axis, p_flag);
 }
 
+void Box3DPhysicsServer3D::pin_joint_set_param(RID p_joint, PinJointParam p_param, real_t p_value) {
+	Box3DJoint3D *joint = joint_owner.get_or_null(p_joint);
+	ERR_FAIL_NULL(joint);
+	joint->set_pin_param(p_param, p_value);
+}
+
+real_t Box3DPhysicsServer3D::pin_joint_get_param(RID p_joint, PinJointParam p_param) const {
+	const Box3DJoint3D *joint = joint_owner.get_or_null(p_joint);
+	ERR_FAIL_NULL_V(joint, 0);
+	return joint->get_pin_param(p_param);
+}
+
+void Box3DPhysicsServer3D::pin_joint_set_local_a(RID p_joint, const Vector3 &p_local_a) {
+	Box3DJoint3D *joint = joint_owner.get_or_null(p_joint);
+	ERR_FAIL_NULL(joint);
+	joint->set_pin_local_a(p_local_a);
+}
+
+Vector3 Box3DPhysicsServer3D::pin_joint_get_local_a(RID p_joint) const {
+	const Box3DJoint3D *joint = joint_owner.get_or_null(p_joint);
+	ERR_FAIL_NULL_V(joint, Vector3());
+	return joint->get_pin_local_a();
+}
+
+void Box3DPhysicsServer3D::pin_joint_set_local_b(RID p_joint, const Vector3 &p_local_b) {
+	Box3DJoint3D *joint = joint_owner.get_or_null(p_joint);
+	ERR_FAIL_NULL(joint);
+	joint->set_pin_local_b(p_local_b);
+}
+
+Vector3 Box3DPhysicsServer3D::pin_joint_get_local_b(RID p_joint) const {
+	const Box3DJoint3D *joint = joint_owner.get_or_null(p_joint);
+	ERR_FAIL_NULL_V(joint, Vector3());
+	return joint->get_pin_local_b();
+}
+
 void Box3DPhysicsServer3D::hinge_joint_set_param(RID p_joint, HingeJointParam p_param, real_t p_value) {
 	Box3DJoint3D *joint = joint_owner.get_or_null(p_joint);
 	ERR_FAIL_NULL(joint);
