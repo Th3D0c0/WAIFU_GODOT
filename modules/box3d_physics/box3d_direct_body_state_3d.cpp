@@ -30,225 +30,130 @@
 
 #include "box3d_direct_body_state_3d.h"
 
-Vector3 Box3DDirectBodyState3D::get_total_gravity() const {
-	B3_TODO();
-	return Vector3();
+#include "box3d_body_3d.h"
+#include "box3d_direct_space_state_3d.h"
+#include "box3d_space_3d.h"
+
+#include "core/error/error_macros.h"
+
+// The remaining entry points are in box3d_direct_body_state_3d_todo.cpp.
+//
+// This object is a thin view onto a Box3DBody3D rather than a snapshot: Godot hands
+// it to the state sync callback during flush_queries, at which point the step is over
+// and reading straight through to Box3D gives the post-step values the scene wants.
+
+Transform3D Box3DDirectBodyState3D::get_transform() const {
+	ERR_FAIL_NULL_V(body, Transform3D());
+	return body->get_transform();
 }
 
-real_t Box3DDirectBodyState3D::get_total_angular_damp() const {
-	B3_TODO();
-	return 0;
-}
-
-real_t Box3DDirectBodyState3D::get_total_linear_damp() const {
-	B3_TODO();
-	return 0;
-}
-
-Vector3 Box3DDirectBodyState3D::get_center_of_mass() const {
-	B3_TODO();
-	return Vector3();
-}
-
-Vector3 Box3DDirectBodyState3D::get_center_of_mass_local() const {
-	B3_TODO();
-	return Vector3();
-}
-
-Basis Box3DDirectBodyState3D::get_principal_inertia_axes() const {
-	B3_TODO();
-	return Basis();
-}
-
-real_t Box3DDirectBodyState3D::get_inverse_mass() const {
-	B3_TODO();
-	return 0;
-}
-
-Vector3 Box3DDirectBodyState3D::get_inverse_inertia() const {
-	B3_TODO();
-	return Vector3();
-}
-
-Basis Box3DDirectBodyState3D::get_inverse_inertia_tensor() const {
-	B3_TODO();
-	return Basis();
-}
-
-void Box3DDirectBodyState3D::set_linear_velocity(const Vector3 &) {
-	B3_TODO();
+void Box3DDirectBodyState3D::set_transform(const Transform3D &p_transform) {
+	ERR_FAIL_NULL(body);
+	body->set_transform(p_transform);
 }
 
 Vector3 Box3DDirectBodyState3D::get_linear_velocity() const {
-	B3_TODO();
-	return Vector3();
+	ERR_FAIL_NULL_V(body, Vector3());
+	return body->get_linear_velocity();
 }
 
-void Box3DDirectBodyState3D::set_angular_velocity(const Vector3 &) {
-	B3_TODO();
+void Box3DDirectBodyState3D::set_linear_velocity(const Vector3 &p_velocity) {
+	ERR_FAIL_NULL(body);
+	body->set_linear_velocity(p_velocity);
 }
 
 Vector3 Box3DDirectBodyState3D::get_angular_velocity() const {
-	B3_TODO();
-	return Vector3();
+	ERR_FAIL_NULL_V(body, Vector3());
+	return body->get_angular_velocity();
 }
 
-void Box3DDirectBodyState3D::set_transform(const Transform3D &) {
-	B3_TODO();
+void Box3DDirectBodyState3D::set_angular_velocity(const Vector3 &p_velocity) {
+	ERR_FAIL_NULL(body);
+	body->set_angular_velocity(p_velocity);
 }
 
-Transform3D Box3DDirectBodyState3D::get_transform() const {
-	B3_TODO();
-	return Transform3D();
+real_t Box3DDirectBodyState3D::get_inverse_mass() const {
+	ERR_FAIL_NULL_V(body, 0);
+	// Static and kinematic bodies are infinitely massive to the solver, which Godot
+	// spells as an inverse mass of zero rather than as a division by infinity.
+	if (body->get_mode() == PhysicsServer3D::BODY_MODE_STATIC || body->get_mode() == PhysicsServer3D::BODY_MODE_KINEMATIC) {
+		return 0;
+	}
+	const real_t mass = body->get_mass();
+	return mass > 0 ? 1 / mass : 0;
 }
 
-Vector3 Box3DDirectBodyState3D::get_velocity_at_local_position(const Vector3 &) const {
-	B3_TODO();
-	return Vector3();
+Vector3 Box3DDirectBodyState3D::get_total_gravity() const {
+	ERR_FAIL_NULL_V(body, Vector3());
+	const Box3DSpace3D *space = body->get_space();
+	if (space == nullptr) {
+		return Vector3();
+	}
+	// Areas can override gravity per-region in Godot, but this backend has no area
+	// objects yet, so the space's gravity scaled by the body's own factor is the
+	// whole story - which is exactly what Box3D applies during the step.
+	return space->get_gravity_vector() * space->get_gravity_magnitude() * body->get_gravity_scale();
 }
 
-void Box3DDirectBodyState3D::apply_central_impulse(const Vector3 &) {
-	B3_TODO();
+real_t Box3DDirectBodyState3D::get_total_linear_damp() const {
+	ERR_FAIL_NULL_V(body, 0);
+	return body->get_linear_damp();
 }
 
-void Box3DDirectBodyState3D::apply_impulse(const Vector3 &, const Vector3 &) {
-	B3_TODO();
+real_t Box3DDirectBodyState3D::get_total_angular_damp() const {
+	ERR_FAIL_NULL_V(body, 0);
+	return body->get_angular_damp();
 }
 
-void Box3DDirectBodyState3D::apply_torque_impulse(const Vector3 &) {
-	B3_TODO();
+void Box3DDirectBodyState3D::apply_central_impulse(const Vector3 &p_impulse) {
+	ERR_FAIL_NULL(body);
+	body->apply_central_impulse(p_impulse);
 }
 
-void Box3DDirectBodyState3D::apply_central_force(const Vector3 &) {
-	B3_TODO();
+void Box3DDirectBodyState3D::apply_impulse(const Vector3 &p_impulse, const Vector3 &p_position) {
+	ERR_FAIL_NULL(body);
+	body->apply_impulse(p_impulse, p_position);
 }
 
-void Box3DDirectBodyState3D::apply_force(const Vector3 &, const Vector3 &) {
-	B3_TODO();
+void Box3DDirectBodyState3D::apply_torque_impulse(const Vector3 &p_impulse) {
+	ERR_FAIL_NULL(body);
+	body->apply_torque_impulse(p_impulse);
 }
 
-void Box3DDirectBodyState3D::apply_torque(const Vector3 &) {
-	B3_TODO();
+void Box3DDirectBodyState3D::apply_central_force(const Vector3 &p_force) {
+	ERR_FAIL_NULL(body);
+	body->apply_central_force(p_force);
 }
 
-void Box3DDirectBodyState3D::add_constant_central_force(const Vector3 &) {
-	B3_TODO();
+void Box3DDirectBodyState3D::apply_force(const Vector3 &p_force, const Vector3 &p_position) {
+	ERR_FAIL_NULL(body);
+	body->apply_force(p_force, p_position);
 }
 
-void Box3DDirectBodyState3D::add_constant_force(const Vector3 &, const Vector3 &) {
-	B3_TODO();
-}
-
-void Box3DDirectBodyState3D::add_constant_torque(const Vector3 &) {
-	B3_TODO();
-}
-
-void Box3DDirectBodyState3D::set_constant_force(const Vector3 &) {
-	B3_TODO();
-}
-
-Vector3 Box3DDirectBodyState3D::get_constant_force() const {
-	B3_TODO();
-	return Vector3();
-}
-
-void Box3DDirectBodyState3D::set_constant_torque(const Vector3 &) {
-	B3_TODO();
-}
-
-Vector3 Box3DDirectBodyState3D::get_constant_torque() const {
-	B3_TODO();
-	return Vector3();
-}
-
-void Box3DDirectBodyState3D::set_sleep_state(bool) {
-	B3_TODO();
+void Box3DDirectBodyState3D::apply_torque(const Vector3 &p_torque) {
+	ERR_FAIL_NULL(body);
+	body->apply_torque(p_torque);
 }
 
 bool Box3DDirectBodyState3D::is_sleeping() const {
-	B3_TODO();
-	return false;
+	ERR_FAIL_NULL_V(body, false);
+	return body->is_sleeping();
 }
 
-void Box3DDirectBodyState3D::set_collision_layer(uint32_t) {
-	B3_TODO();
-}
-
-uint32_t Box3DDirectBodyState3D::get_collision_layer() const {
-	B3_TODO();
-	return 0;
-}
-
-void Box3DDirectBodyState3D::set_collision_mask(uint32_t) {
-	B3_TODO();
-}
-
-uint32_t Box3DDirectBodyState3D::get_collision_mask() const {
-	B3_TODO();
-	return 0;
-}
-
-int Box3DDirectBodyState3D::get_contact_count() const {
-	B3_TODO();
-	return 0;
-}
-
-Vector3 Box3DDirectBodyState3D::get_contact_local_position(int) const {
-	B3_TODO();
-	return Vector3();
-}
-
-Vector3 Box3DDirectBodyState3D::get_contact_local_normal(int) const {
-	B3_TODO();
-	return Vector3();
-}
-
-Vector3 Box3DDirectBodyState3D::get_contact_impulse(int) const {
-	B3_TODO();
-	return Vector3();
-}
-
-int Box3DDirectBodyState3D::get_contact_local_shape(int) const {
-	B3_TODO();
-	return 0;
-}
-
-Vector3 Box3DDirectBodyState3D::get_contact_local_velocity_at_position(int) const {
-	B3_TODO();
-	return Vector3();
-}
-
-RID Box3DDirectBodyState3D::get_contact_collider(int) const {
-	B3_TODO();
-	return RID();
-}
-
-Vector3 Box3DDirectBodyState3D::get_contact_collider_position(int) const {
-	B3_TODO();
-	return Vector3();
-}
-
-ObjectID Box3DDirectBodyState3D::get_contact_collider_id(int) const {
-	B3_TODO();
-	return ObjectID();
-}
-
-int Box3DDirectBodyState3D::get_contact_collider_shape(int) const {
-	B3_TODO();
-	return 0;
-}
-
-Vector3 Box3DDirectBodyState3D::get_contact_collider_velocity_at_position(int) const {
-	B3_TODO();
-	return Vector3();
+void Box3DDirectBodyState3D::set_sleep_state(bool p_sleep) {
+	ERR_FAIL_NULL(body);
+	body->set_sleeping(p_sleep);
 }
 
 real_t Box3DDirectBodyState3D::get_step() const {
-	B3_TODO();
-	return 0;
+	ERR_FAIL_NULL_V(body, 0);
+	const Box3DSpace3D *space = body->get_space();
+	return space != nullptr ? space->get_last_step() : 0;
 }
 
 RequiredResult<PhysicsDirectSpaceState3D> Box3DDirectBodyState3D::get_space_state() {
-	B3_TODO();
-	return RequiredResult<PhysicsDirectSpaceState3D>();
+	ERR_FAIL_NULL_V(body, nullptr);
+	Box3DSpace3D *space = body->get_space();
+	ERR_FAIL_NULL_V(space, nullptr);
+	return space->get_direct_state();
 }

@@ -204,13 +204,36 @@ each needs a decision before the corresponding stubs can be written:
 | `PinJoint3D` | `b3SphericalJoint` with limits off | fine |
 | `ConeTwistJoint3D` | `b3SphericalJoint` cone + twist | fine, arguably better |
 | `HingeJoint3D` / `SliderJoint3D` | revolute / prismatic | fine |
-| `CylinderShape3D` | no cylinder primitive | `GrabTest`, `RaillingTest`, `Fire_Wand_L1` |
+| `CylinderShape3D` | ~~none~~ `b3CreateCylinder` tessellates one, 16 sides | resolved, approximate |
 | `SoftBody3D` | none at all | 40 of the 249 methods can only ever be stubs |
 | live shape scale | scale is baked at hull/mesh creation | rescaling means rebaking |
 
 The one genuine win on the other side: `b3MotorJointDef` has
 `angularHertz`/`angularDampingRatio`/`maxSpringTorque` as first-class documented API —
 exactly what the `jolt_physics` patch in the rebase checklist had to expose by hand.
+
+### What actually runs today
+
+Shapes, bodies, spaces, stepping, transform sync and downward raycasts. A box and a
+sphere dropped from 5 m rest at y=0.499 against a 1 mm soft-solver penetration, and a
+capsule, a cylinder and a convex hull land correctly on a `ConcavePolygonShape3D`
+floor. Joints, areas, contact reporting, `body_test_motion` and the remaining queries
+are still stubs — run a scene and `B3_TODO()` names them.
+
+Three Box3D behaviors that are not guessable from the headers and cost a debug cycle
+each if rediscovered:
+
+- **`b3CreateCylinder` is base-anchored**, spanning `y` in `[yOffset, yOffset+height]`
+  (`hull.c:1789-1790`). Godot's `CylinderShape3D` is centered, so `yOffset` must be
+  `-height/2`. Passing 0 sinks the shape by half its height and it rests at y≈0.
+- **`b3CreateMeshShape` does not clone its mesh** — "must remain valid for the lifetime
+  of this shape" — unlike hulls, which are cloned. The `b3MeshData*` is therefore owned
+  per shape instance and destroyed strictly *after* the shape. Mesh collision also only
+  generates contacts against static bodies, which is why concave shapes are skipped on
+  non-static ones rather than silently doing nothing.
+- **Vertex welding is skipped unless `weldTolerance > 0`** (`mesh.c:1579`), so setting
+  `weldVertices = true` alone does nothing and the internal-edge handling that depends
+  on it never engages.
 
 ## Additive modules over core patches — important
 
