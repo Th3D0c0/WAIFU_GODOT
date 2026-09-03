@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  box3d_direct_space_state_3d.h                                         */
+/*  box3d_query_3d.cpp                                                    */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -28,32 +28,33 @@
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
 /**************************************************************************/
 
-#pragma once
+#include "box3d_query_3d.h"
 
-#include "core/templates/local_vector.h"
-#include "servers/physics_3d/physics_server_3d.h"
+b3QueryFilter box3d_make_query_filter(uint32_t p_collision_mask) {
+	b3QueryFilter filter = b3DefaultQueryFilter();
+	filter.categoryBits = UINT64_MAX;
+	filter.maskBits = p_collision_mask;
+	return filter;
+}
 
-#include <box3d/box3d.h>
+Box3DCollisionObject3D *Box3DQueryContext::resolve(b3ShapeId p_shape) const {
+	if (!b3Shape_IsValid(p_shape)) {
+		return nullptr;
+	}
+	const b3BodyId body = b3Shape_GetBody(p_shape);
+	if (!B3_IS_NON_NULL(body)) {
+		return nullptr;
+	}
 
-class Box3DSpace3D;
-
-class Box3DDirectSpaceState3D : public PhysicsDirectSpaceState3D {
-	GDCLASS(Box3DDirectSpaceState3D, PhysicsDirectSpaceState3D);
-
-	Box3DSpace3D *space = nullptr;
-
-	bool _make_proxy(const ShapeParameters &p_parameters, LocalVector<b3Vec3> &r_points,
-			b3ShapeProxy &r_proxy, bool p_inflate_by_margin) const;
-
-public:
-	explicit Box3DDirectSpaceState3D(Box3DSpace3D *p_space) :
-			space(p_space) {}
-
-	virtual bool intersect_ray(const RayParameters &p_parameters, RayResult &r_result) override;
-	virtual int intersect_point(const PointParameters &p_parameters, ShapeResult *r_results, int p_result_max) override;
-	virtual int intersect_shape(const ShapeParameters &p_parameters, ShapeResult *r_results, int p_result_max) override;
-	virtual bool cast_motion(const ShapeParameters &p_parameters, real_t &p_closest_safe, real_t &p_closest_unsafe, ShapeRestInfo *r_info) override;
-	virtual bool collide_shape(const ShapeParameters &p_parameters, Vector3 *r_results, int p_result_max, int &r_result_count) override; // TODO
-	virtual bool rest_info(const ShapeParameters &p_parameters, ShapeRestInfo *r_info) override;
-	virtual Vector3 get_closest_point_to_object_volume(RID p_object, const Vector3 p_point) const override; // TODO
-};
+	Box3DCollisionObject3D *object = static_cast<Box3DCollisionObject3D *>(b3Body_GetUserData(body));
+	if (object == nullptr) {
+		return nullptr;
+	}
+	if (object->is_area() ? !collide_with_areas : !collide_with_bodies) {
+		return nullptr;
+	}
+	if (exclude != nullptr && exclude->has(object->get_self())) {
+		return nullptr;
+	}
+	return object;
+}

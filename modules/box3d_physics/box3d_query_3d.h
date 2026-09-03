@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  box3d_direct_space_state_3d.h                                         */
+/*  box3d_query_3d.h                                                      */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -30,30 +30,32 @@
 
 #pragma once
 
+#include "box3d_collision_object_3d.h"
+
+#include "core/templates/hash_set.h"
 #include "core/templates/local_vector.h"
-#include "servers/physics_3d/physics_server_3d.h"
+#include "core/templates/rid.h"
 
 #include <box3d/box3d.h>
 
-class Box3DSpace3D;
+// Shared plumbing for the shape-based space queries.
+//
+// Box3D's overlap and cast entry points take a filter that can only express layer
+// bits, and hand results back through a C callback with a void* context. Everything
+// Godot additionally filters on - excluded RIDs, whether areas or bodies are eligible,
+// which shape index was hit - has to be resolved on our side inside that callback.
+// This is the context those callbacks share so the rules are written once.
+struct Box3DQueryContext {
+	const HashSet<RID> *exclude = nullptr;
+	bool collide_with_bodies = true;
+	bool collide_with_areas = false;
 
-class Box3DDirectSpaceState3D : public PhysicsDirectSpaceState3D {
-	GDCLASS(Box3DDirectSpaceState3D, PhysicsDirectSpaceState3D);
-
-	Box3DSpace3D *space = nullptr;
-
-	bool _make_proxy(const ShapeParameters &p_parameters, LocalVector<b3Vec3> &r_points,
-			b3ShapeProxy &r_proxy, bool p_inflate_by_margin) const;
-
-public:
-	explicit Box3DDirectSpaceState3D(Box3DSpace3D *p_space) :
-			space(p_space) {}
-
-	virtual bool intersect_ray(const RayParameters &p_parameters, RayResult &r_result) override;
-	virtual int intersect_point(const PointParameters &p_parameters, ShapeResult *r_results, int p_result_max) override;
-	virtual int intersect_shape(const ShapeParameters &p_parameters, ShapeResult *r_results, int p_result_max) override;
-	virtual bool cast_motion(const ShapeParameters &p_parameters, real_t &p_closest_safe, real_t &p_closest_unsafe, ShapeRestInfo *r_info) override;
-	virtual bool collide_shape(const ShapeParameters &p_parameters, Vector3 *r_results, int p_result_max, int &r_result_count) override; // TODO
-	virtual bool rest_info(const ShapeParameters &p_parameters, ShapeRestInfo *r_info) override;
-	virtual Vector3 get_closest_point_to_object_volume(RID p_object, const Vector3 p_point) const override; // TODO
+	// Resolves a hit shape to the object that owns it, applying every filter Godot
+	// asks for and Box3D cannot. Returns nullptr when the shape should be ignored.
+	Box3DCollisionObject3D *resolve(b3ShapeId p_shape) const;
 };
+
+// Builds the layer/mask filter for a query. Godot queries carry only a mask and expect
+// to hit anything whose layer intersects it, so the query presents itself as belonging
+// to every category and the shape's own mask is left out of the test.
+b3QueryFilter box3d_make_query_filter(uint32_t p_collision_mask);

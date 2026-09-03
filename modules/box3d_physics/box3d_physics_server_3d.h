@@ -54,8 +54,21 @@ class Box3DPhysicsServer3D : public PhysicsServer3D {
 	HashSet<Box3DSpace3D *> active_spaces;
 
 	RID _create_shape(int p_type);
+	bool _test_motion_mover(Box3DBody3D *p_body, Box3DShape3D *p_shape,
+			const MotionParameters &p_parameters, MotionResult *r_result);
+
+	static Box3DPhysicsServer3D *singleton;
 
 public:
+	Box3DPhysicsServer3D();
+	~Box3DPhysicsServer3D();
+
+	// The query code has to turn a shape RID back into a Box3DShape3D and only has a
+	// space to work from, so the server is reachable the way JoltPhysicsServer3D makes
+	// itself reachable.
+	static Box3DPhysicsServer3D *get_singleton() { return singleton; }
+	Box3DShape3D *get_shape(RID p_shape) const { return shape_owner.get_or_null(p_shape); }
+
 	virtual RID world_boundary_shape_create() override; // TODO
 	virtual RID separation_ray_shape_create() override; // TODO
 	virtual RID sphere_shape_create() override;
@@ -168,7 +181,7 @@ public:
 	virtual void body_set_force_integration_callback(RID p_body, const Callable &p_callable, const Variant &p_udata) override; // TODO
 	virtual void body_set_ray_pickable(RID p_body, bool p_enable) override;
 	virtual PhysicsDirectBodyState3D *body_get_direct_state(RID p_body) override;
-	virtual bool body_test_motion(RID p_body, const MotionParameters &p_parameters, MotionResult *r_result) override; // TODO
+	virtual bool body_test_motion(RID p_body, const MotionParameters &p_parameters, MotionResult *r_result) override;
 	virtual RID soft_body_create() override; // TODO
 	virtual void soft_body_update_rendering_server(RID p_body, RequiredParam<PhysicsServer3DRenderingServerHandler> rp_rendering_server_handler) override; // TODO
 	virtual void soft_body_set_space(RID p_body, RID p_space) override; // TODO

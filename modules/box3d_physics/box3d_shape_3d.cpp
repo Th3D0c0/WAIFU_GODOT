@@ -36,14 +36,6 @@
 #include "core/templates/local_vector.h"
 #include "core/typedefs.h"
 
-// Number of sides used when approximating a cylinder.
-//
-// Box3D has no analytic cylinder; b3CreateCylinder tessellates one into a convex hull,
-// so the count is a fidelity/cost trade rather than a detail. Sixteen keeps the radial
-// error under 2% (1 - cos(pi/16)), which is below the contact skin most collisions
-// resolve within, while staying cheap enough for the face count SAT walks.
-static constexpr int CYLINDER_SIDES = 16;
-
 void Box3DShape3D::set_data(const Variant &p_data) {
 	data = p_data;
 
@@ -204,4 +196,98 @@ Box3DShape3D::~Box3DShape3D() {
 	// rebuild rather than fail loudly later.
 	ERR_FAIL_COND_MSG(!dependents.is_empty(), "Box3D: a shape was freed while bodies still referenced it.");
 	ERR_FAIL_COND_MSG(!area_dependents.is_empty(), "Box3D: a shape was freed while areas still referenced it.");
+}
+
+bool Box3DShape3D::build_proxy(const Transform3D &p_transform, real_t p_inset, LocalVector<b3Vec3> &r_points,
+		float &r_radius) const {
+	r_points.clear();
+	r_radius = 0.0f;
+
+	// p_inset grows the proxy when positive and shrinks it when negative. A swept cast
+	// passes a negative inset so a body resting exactly on a surface does not begin the
+	// sweep already overlapping - Box3D reports that as fraction zero with a degenerate
+	// zero normal, which tells Godot nothing and leaves a character unable to step off
+	// the floor it is standing on.
+	const real_t inset_radius = MAX((real_t)0.0, radius + p_inset);
+	const Vector3 inset_extents = Vector3(
+			MAX((real_t)0.0, half_extents.x + p_inset),
+			MAX((real_t)0.0, half_extents.y + p_inset),
+			MAX((real_t)0.0, half_extents.z + p_inset));
+
+	switch (type) {
+		case TYPE_SPHERE: {
+			// A sphere is one point swept by its radius, which is exactly the shape
+			// b3ShapeProxy is built around.
+			r_points.push_back(to_b3(p_transform.origin));
+			r_radius = (float)inset_radius;
+			return true;
+		}
+
+		case TYPE_CAPSULE: {
+			const real_t half_segment = MAX((real_t)0.0, height * 0.5 - radius);
+			const Vector3 axis = p_transform.basis.get_column(Vector3::AXIS_Y) * half_segment;
+			r_points.push_back(to_b3(p_transform.origin + axis));
+			r_points.push_back(to_b3(p_transform.origin - axis));
+			r_radius = (float)inset_radius;
+			return true;
+		}
+
+		case TYPE_BOX: {
+			for (int i = 0; i < 8; i++) {
+				const Vector3 corner(
+						(i & 1) ? inset_extents.x : -inset_extents.x,
+						(i & 2) ? inset_extents.y : -inset_extents.y,
+						(i & 4) ? inset_extents.z : -inset_extents.z);
+				r_points.push_back(to_b3(p_transform.xform(corner)));
+			}
+			return true;
+		}
+
+		case TYPE_CYLINDER: {
+			// The proxy has to be the same tessellation the collision shape uses, or a
+			// query would disagree with the contact it is predicting.
+			const real_t half_height = MAX((real_t)0.0, height * 0.5 + p_inset);
+			for (int i = 0; i < CYLINDER_SIDES; i++) {
+				const real_t a = Math::TAU * (real_t)i / (real_t)CYLINDER_SIDES;
+				const real_t x = inset_radius * Math::cos(a);
+				const real_t z = inset_radius * Math::sin(a);
+				r_points.push_back(to_b3(p_transform.xform(Vector3(x, half_height, z))));
+				r_points.push_back(to_b3(p_transform.xform(Vector3(x, -half_height, z))));
+			}
+			return true;
+		}
+
+		case TYPE_CONVEX: {
+			ERR_FAIL_COND_V(points.is_empty(), false);
+			// Box3D caps a proxy's point count. Beyond that the cloud is subsampled
+			// evenly rather than truncated, so the proxy still spans the whole shape
+			// instead of collapsing onto whichever vertices happened to come first.
+			const int count = points.size();
+			const int step = MAX(1, (count + B3_MAX_SHAPE_CAST_POINTS - 1) / B3_MAX_SHAPE_CAST_POINTS);
+			for (int i = 0; i < count && (int)r_points.size() < B3_MAX_SHAPE_CAST_POINTS; i += step) {
+				r_points.push_back(to_b3(p_transform.xform(points[i])));
+			}
+			// A convex hull's points cannot be inset without recomputing the hull, so the
+			// skin is applied as a proxy radius when growing and simply dropped when
+			// shrinking. A convex-shaped character therefore keeps the degenerate
+			// resting-contact behavior that inset would otherwise avoid.
+			r_radius = (float)MAX((real_t)0.0, p_inset);
+			if (step > 1) {
+				WARN_PRINT_ONCE(vformat(
+						"Box3D: a convex shape with %d points was subsampled to %d for a query proxy; "
+						"Box3D allows at most %d (B3_MAX_SHAPE_CAST_POINTS). The query is conservative "
+						"but not exact for this shape.",
+						count, r_points.size(), B3_MAX_SHAPE_CAST_POINTS));
+			}
+			return true;
+		}
+
+		case TYPE_CONCAVE:
+		case TYPE_UNSUPPORTED: {
+			// A triangle soup has no convex proxy. Box3D can cast *against* one but not
+			// *with* it, which matches Godot, where concave shapes are static geometry.
+			return false;
+		}
+	}
+	return false;
 }

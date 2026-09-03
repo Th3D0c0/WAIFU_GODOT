@@ -32,6 +32,7 @@
 
 #include "core/math/transform_3d.h"
 #include "core/templates/hash_set.h"
+#include "core/templates/local_vector.h"
 #include "core/templates/rid.h"
 #include "core/variant/variant.h"
 
@@ -64,6 +65,15 @@ public:
 		TYPE_CONCAVE,
 		TYPE_UNSUPPORTED,
 	};
+
+	// Number of sides used when approximating a cylinder.
+	//
+	// Box3D has no analytic cylinder; b3CreateCylinder tessellates one into a convex
+	// hull, so the count is a fidelity/cost trade rather than a detail. Sixteen keeps
+	// the radial error under 2% (1 - cos(pi/16)), which is below the contact skin most
+	// collisions resolve within, while staying cheap enough for the face counts SAT
+	// walks. Shared with build_proxy() so a query agrees with the collision shape.
+	static constexpr int CYLINDER_SIDES = 16;
 
 private:
 	// Each object carries the RID it was allocated under, so the server can answer
@@ -116,6 +126,17 @@ public:
 	// must keep alive and destroy later - see the ownership note in the .cpp.
 	b3ShapeId instantiate(b3BodyId p_body, const b3ShapeDef &p_def, const Transform3D &p_transform,
 			b3HullData **r_owned_hull, b3MeshData **r_owned_mesh) const;
+
+	// Builds the point-cloud-plus-radius form Box3D's overlap and shape-cast queries
+	// take. The points are written in the frame p_transform puts the shape in, since
+	// b3ShapeProxy carries no transform of its own. Returns false for shapes with no
+	// convex proxy - concave meshes and height fields, which Box3D cannot cast *with*
+	// (only against). Points are capped at B3_MAX_SHAPE_CAST_POINTS.
+	//
+	// p_inset grows the proxy when positive and shrinks it when negative; sweeps pass a
+	// negative inset so resting contact is not an initial overlap.
+	bool build_proxy(const Transform3D &p_transform, real_t p_inset, LocalVector<b3Vec3> &r_points,
+			float &r_radius) const;
 
 	~Box3DShape3D();
 };

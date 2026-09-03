@@ -36,6 +36,7 @@
 #include "box3d_direct_body_state_3d.h"
 #include "box3d_direct_space_state_3d.h"
 #include "box3d_joint_3d.h"
+#include "box3d_query_3d.h"
 #include "box3d_shape_3d.h"
 #include "box3d_space_3d.h"
 
@@ -958,4 +959,240 @@ void Box3DPhysicsServer3D::area_set_area_monitor_callback(RID p_area, const Call
 	Box3DArea3D *area = area_owner.get_or_null(p_area);
 	ERR_FAIL_NULL(area);
 	area->set_area_monitor_callback(p_callback);
+}
+
+Box3DPhysicsServer3D *Box3DPhysicsServer3D::singleton = nullptr;
+
+Box3DPhysicsServer3D::Box3DPhysicsServer3D() {
+	singleton = this;
+}
+
+Box3DPhysicsServer3D::~Box3DPhysicsServer3D() {
+	if (singleton == this) {
+		singleton = nullptr;
+	}
+}
+
+// Collects the collision planes b3SolvePlanes needs for a capsule mover.
+struct MoverPlanes {
+	Box3DQueryContext filter;
+	b3CollisionPlane planes[8];
+	// The object each plane came from, so the reported collision can name a collider.
+	// Without it Godot receives an empty RID and every get_slide_collision() lookup
+	// asks the server for the state of a body that does not exist.
+	Box3DCollisionObject3D *objects[8] = {};
+	int count = 0;
+};
+
+static bool mover_plane_fcn(b3ShapeId p_shape, const b3PlaneResult *p_plane, int p_plane_count, void *p_context) {
+	MoverPlanes *ctx = static_cast<MoverPlanes *>(p_context);
+	Box3DCollisionObject3D *object = ctx->filter.resolve(p_shape);
+	if (object == nullptr) {
+		return true;
+	}
+	for (int i = 0; i < p_plane_count && ctx->count < 8; i++) {
+		ctx->objects[ctx->count] = object;
+		b3CollisionPlane &plane = ctx->planes[ctx->count++];
+		plane.plane = p_plane[i].plane;
+		// FLT_MAX makes the plane maximally rigid, which is what a character standing
+		// on the ground wants; a soft plane would let it sink.
+		plane.pushLimit = FLT_MAX;
+		plane.push = 0.0f;
+		plane.clipVelocity = true;
+	}
+	return ctx->count < 8;
+}
+
+// Capsule bodies go through Box3D's own character-mover path.
+//
+// A plain shape cast cannot serve move_and_slide on its own: Box3D reports a body that
+// is already interpenetrating at fraction zero with a degenerate zero-length normal,
+// which tells Godot nothing, and a character always ends up slightly interpenetrating
+// after its first landing. Treating that as a blocking hit freezes the character in
+// place; ignoring it lets the character tunnel through the floor. Neither is a bug in
+// the cast - the missing piece is depenetration, and b3World_CollideMover plus
+// b3SolvePlanes is precisely the primitive Box3D provides for it: the planes carry the
+// push needed to separate, and the solver returns a delta that is both depenetrated
+// and clipped against them.
+//
+// The mover is capsule-only, which is why this is a special case rather than the whole
+// implementation. It covers CharacterBody3D as it is normally authored.
+bool Box3DPhysicsServer3D::_test_motion_mover(Box3DBody3D *p_body, Box3DShape3D *p_shape,
+		const MotionParameters &p_parameters, MotionResult *r_result) {
+	Box3DSpace3D *space = p_body->get_space();
+
+	const Transform3D shape_transform = p_parameters.from * p_body->get_shape_transform(0);
+	const Dictionary data = p_shape->get_data();
+	const real_t radius = data["radius"];
+	const real_t height = data["height"];
+	const real_t half_segment = MAX((real_t)0.0, height * 0.5 - radius);
+	const Vector3 axis = shape_transform.basis.get_column(Vector3::AXIS_Y) * half_segment;
+
+	b3Capsule capsule = {
+		to_b3(shape_transform.origin + axis),
+		to_b3(shape_transform.origin - axis),
+		(float)radius,
+	};
+
+	// A mover is a free capsule rather than a shape on a body, so it would otherwise
+	// collide with the character's own shapes and gather a degenerate self-plane.
+	HashSet<RID> exclude;
+	for (const RID &rid : p_parameters.exclude_bodies) {
+		exclude.insert(rid);
+	}
+	exclude.insert(p_body->get_self());
+
+	MoverPlanes ctx;
+	ctx.filter.exclude = &exclude;
+	ctx.filter.collide_with_bodies = true;
+	ctx.filter.collide_with_areas = false;
+
+	b3World_CollideMover(space->get_world_id(), to_b3_pos(Vector3()), &capsule,
+			box3d_make_query_filter(p_body->get_collision_mask()), mover_plane_fcn, &ctx);
+
+	if (ctx.count == 0) {
+		return false;
+	}
+
+	const b3PlaneSolverResult solved = b3SolvePlanes(to_b3(p_parameters.motion), ctx.planes, ctx.count);
+	const Vector3 travel = to_godot(solved.delta);
+
+	// With nothing in the way the solver returns the motion unchanged, which is not a
+	// collision however many planes were gathered.
+	if (travel.is_equal_approx(p_parameters.motion)) {
+		return false;
+	}
+
+	if (r_result != nullptr) {
+		r_result->travel = travel;
+		r_result->remainder = p_parameters.motion - travel;
+		const real_t motion_length = p_parameters.motion.length();
+		const real_t fraction = motion_length > 0 ? travel.length() / motion_length : 0;
+		r_result->collision_safe_fraction = fraction;
+		r_result->collision_unsafe_fraction = fraction;
+
+		// Godot wants one representative contact, and the plane most opposed to the
+		// motion is the one that actually stopped it - reporting any other would make
+		// move_and_slide classify the surface wrongly and break is_on_floor().
+		int best = 0;
+		real_t best_dot = 1.0;
+		for (int i = 0; i < ctx.count; i++) {
+			const Vector3 normal = to_godot(ctx.planes[i].plane.normal);
+			const real_t dot = normal.dot(p_parameters.motion.normalized());
+			if (dot < best_dot) {
+				best_dot = dot;
+				best = i;
+			}
+		}
+
+		MotionCollision &collision = r_result->collisions[0];
+		collision.normal = to_godot(ctx.planes[best].plane.normal);
+		collision.position = p_parameters.from.origin;
+		collision.collider_velocity = ctx.objects[best]->is_area()
+				? Vector3()
+				: static_cast<Box3DBody3D *>(ctx.objects[best])->get_linear_velocity();
+		collision.collider_angular_velocity = ctx.objects[best]->is_area()
+				? Vector3()
+				: static_cast<Box3DBody3D *>(ctx.objects[best])->get_angular_velocity();
+		collision.depth = MAX((real_t)0.0, (real_t)ctx.planes[best].push);
+		collision.local_shape = 0;
+		collision.collider_id = ctx.objects[best]->get_instance_id();
+		collision.collider = ctx.objects[best]->get_self();
+		collision.collider_shape = 0;
+		r_result->collision_count = 1;
+	}
+	return true;
+}
+
+bool Box3DPhysicsServer3D::body_test_motion(RID p_body, const MotionParameters &p_parameters, MotionResult *r_result) {
+	Box3DBody3D *body = body_owner.get_or_null(p_body);
+	ERR_FAIL_NULL_V(body, false);
+	Box3DSpace3D *space = body->get_space();
+	ERR_FAIL_NULL_V(space, false);
+
+	if (r_result != nullptr) {
+		*r_result = MotionResult();
+		r_result->travel = p_parameters.motion;
+		r_result->remainder = Vector3();
+		r_result->collision_safe_fraction = 1.0;
+		r_result->collision_unsafe_fraction = 1.0;
+	}
+
+	// This is what CharacterBody3D's move_and_slide and move_and_collide are built on:
+	// sweep the body's own shapes along the motion and report the first thing hit. The
+	// body's shapes are swept one at a time and the earliest impact wins, because
+	// Box3D casts a single convex proxy per call and a Godot body may carry several.
+	// A single-capsule body is the shape CharacterBody3D almost always has, and it is
+	// the only shape Box3D's mover accepts.
+	if (body->get_shape_count() == 1) {
+		Box3DShape3D *shape = body->get_shape(0);
+		if (shape != nullptr && shape->get_type() == Box3DShape3D::TYPE_CAPSULE) {
+			return _test_motion_mover(body, shape, p_parameters, r_result);
+		}
+	}
+
+	PhysicsDirectSpaceState3D::ShapeParameters params;
+	params.transform = p_parameters.from;
+	params.motion = p_parameters.motion;
+	params.margin = p_parameters.margin;
+	params.exclude = p_parameters.exclude_bodies;
+	params.exclude.insert(p_body);
+	params.collision_mask = body->get_collision_mask();
+	params.collide_with_bodies = true;
+	params.collide_with_areas = false;
+
+	Box3DDirectSpaceState3D *state = space->get_direct_state();
+	ERR_FAIL_NULL_V(state, false);
+
+	bool hit = false;
+	real_t best_fraction = 1.0;
+	PhysicsDirectSpaceState3D::ShapeRestInfo best_info;
+
+	for (int i = 0; i < body->get_shape_count(); i++) {
+		Box3DShape3D *shape = body->get_shape(i);
+		if (shape == nullptr || !shape->is_valid() || shape->is_static_only()) {
+			continue;
+		}
+		params.shape_rid = shape->get_self();
+		// The shape's own offset on the body has to ride along, or a multi-shape body
+		// would sweep every shape from the body origin.
+		params.transform = p_parameters.from * body->get_shape_transform(i);
+
+		real_t safe = 1.0;
+		real_t unsafe = 1.0;
+		PhysicsDirectSpaceState3D::ShapeRestInfo info;
+		if (!state->cast_motion(params, safe, unsafe, &info)) {
+			continue;
+		}
+		if (!hit || safe < best_fraction) {
+			hit = true;
+			best_fraction = safe;
+			best_info = info;
+		}
+	}
+
+	if (!hit) {
+		return false;
+	}
+
+	if (r_result != nullptr) {
+		r_result->travel = p_parameters.motion * best_fraction;
+		r_result->remainder = p_parameters.motion - r_result->travel;
+		r_result->collision_safe_fraction = best_fraction;
+		r_result->collision_unsafe_fraction = best_fraction;
+		r_result->collision_depth = 0.0;
+
+		MotionCollision &collision = r_result->collisions[0];
+		collision.position = best_info.point;
+		collision.normal = best_info.normal;
+		collision.collider_velocity = best_info.linear_velocity;
+		collision.collider_angular_velocity = Vector3();
+		collision.depth = 0.0;
+		collision.local_shape = 0;
+		collision.collider_id = best_info.collider_id;
+		collision.collider = best_info.rid;
+		collision.collider_shape = best_info.shape;
+		r_result->collision_count = 1;
+	}
+	return true;
 }

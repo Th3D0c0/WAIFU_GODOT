@@ -43,7 +43,6 @@ public:
 	explicit Box3DDirectBodyState3D(Box3DBody3D *p_body) :
 			body(p_body) {}
 
-public:
 	virtual Vector3 get_total_gravity() const override;
 	virtual real_t get_total_angular_damp() const override;
 	virtual real_t get_total_linear_damp() const override;

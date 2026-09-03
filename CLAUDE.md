@@ -274,6 +274,40 @@ Two axis conventions differ and are converted rather than assumed:
 - **Hinge and slider** happen to agree already — revolute is Z on both, prismatic and
   Godot's slider are both X — so those need no conversion.
 
+### Queries, and why CharacterBody3D needs the mover
+
+Box3D's overlap and cast entry points take a `b3ShapeProxy` — a point cloud plus an
+external radius — so every convex Godot shape maps to one and `Box3DShape3D::build_proxy`
+builds it. Concave shapes have no proxy: Box3D can cast *against* a mesh but not *with*
+one, which matches Godot, where concave shapes are static geometry.
+
+The margin is signed, and the sign matters. It **grows** the proxy for an overlap test,
+where it is a tolerance, and **shrinks** it for a sweep, where it is the skin that keeps
+resting contact from registering as an initial overlap.
+
+That still is not enough for `move_and_slide`, and the reason is worth keeping:
+
+- **Box3D reports an already-interpenetrating shape at fraction 0 with a degenerate
+  zero-length normal.** It is saying "already touching", not "you hit a wall here".
+  Godot can do nothing with it — the surface classifies as neither floor nor wall, so
+  `is_on_floor()` is false and slide has no plane to slide along.
+- Treating that as a blocking hit **freezes** the character: it settles a fraction into
+  the ground on its first landing and never moves again.
+- Ignoring it lets the character **tunnel** straight through the floor and the wall.
+
+Neither is a bug in the cast. The missing piece is depenetration, and
+`b3World_CollideMover` + `b3SolvePlanes` is exactly the primitive Box3D provides for it:
+the planes carry the push needed to separate and the solver returns a delta that is both
+depenetrated and clipped. `body_test_motion` therefore routes a single-capsule body —
+what `CharacterBody3D` almost always is — through the mover, and everything else through
+the plain sweep. **A mover is a free capsule, not a shape on a body, so it collides with
+the character's own shapes unless they are excluded**; forgetting that yields a
+degenerate self-plane and no movement at all.
+
+Verified against Jolt on the same scene: a capsule character walking into a wall stops
+at x=4.105 (Jolt 4.100) resting at y=0.895 (Jolt 0.901) with `is_on_floor()` true, and
+`cast_motion` returns 0.400 on both backends.
+
 ### Areas are sensors, and userData is shared
 
 `Area3D` maps onto a kinematic Box3D body whose shapes carry `isSensor`. Overlaps
