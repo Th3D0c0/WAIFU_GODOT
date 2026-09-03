@@ -59,7 +59,11 @@ public:
 	void set_greeting(const String &p_greeting);
 	String get_greeting() const;
 
-	void set_mood(Mood p_mood);
+	// Takes an int rather than Mood on purpose. This is reachable from scripting and
+	// from the property system, so it has to be able to *receive* an out-of-range
+	// value in order to reject it - and merely loading one into an enum-typed
+	// parameter is undefined behavior, which is what the sanitizer build catches.
+	void set_mood(int p_mood);
 	Mood get_mood() const;
 
 	String greet(const String &p_name) const;

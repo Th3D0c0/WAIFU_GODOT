@@ -72,7 +72,7 @@ TEST_CASE("[Modules][WaifuTest] Greeting depends on mood") {
 
 	// Out-of-range values must be rejected and leave the mood untouched.
 	ERR_PRINT_OFF;
-	waifu->set_mood((WaifuTest::Mood)42);
+	waifu->set_mood(42);
 	ERR_PRINT_ON;
 	CHECK(waifu->get_mood() == WaifuTest::MOOD_HAPPY);
 }

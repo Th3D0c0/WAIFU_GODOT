@@ -32,7 +32,6 @@
 
 #include "../projectiles.h"
 
-#include "core/object/class_db.h"
 #include "tests/test_macros.h"
 
 // Everything here runs outside the scene tree on purpose. `_tick` bails when

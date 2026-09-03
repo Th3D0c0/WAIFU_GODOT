@@ -40,9 +40,9 @@ String WaifuTest::get_greeting() const {
 	return greeting;
 }
 
-void WaifuTest::set_mood(Mood p_mood) {
-	ERR_FAIL_INDEX((int)p_mood, MOOD_MAX);
-	mood = p_mood;
+void WaifuTest::set_mood(int p_mood) {
+	ERR_FAIL_INDEX(p_mood, MOOD_MAX);
+	mood = (Mood)p_mood;
 }
 
 WaifuTest::Mood WaifuTest::get_mood() const {
