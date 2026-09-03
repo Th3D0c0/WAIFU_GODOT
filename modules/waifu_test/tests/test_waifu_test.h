@@ -70,9 +70,14 @@ TEST_CASE("[Modules][WaifuTest] Greeting depends on mood") {
 	waifu->set_greeting(U"こんにちは");
 	CHECK(waifu->greet(U"ゴドー") == U"こんにちは, ゴドー!");
 
-	// Out-of-range values must be rejected and leave the mood untouched.
+	// Out-of-range values must be rejected and leave the mood untouched. MOOD_MAX is
+	// used rather than an arbitrary number because it is a real enumerator, so the
+	// value is legal to hold in a Mood while still failing the bounds check. Casting
+	// something like 42 to Mood is itself undefined behavior - the enum's underlying
+	// range only spans its enumerators - and the sanitizer build reports it as a
+	// "load of value 42, which is not a valid value for type 'WaifuTest::Mood'".
 	ERR_PRINT_OFF;
-	waifu->set_mood(42);
+	waifu->set_mood(WaifuTest::MOOD_MAX);
 	ERR_PRINT_ON;
 	CHECK(waifu->get_mood() == WaifuTest::MOOD_HAPPY);
 }
