@@ -57,15 +57,6 @@ RID Box3DPhysicsServer3D::custom_shape_create() {
 	return RID();
 }
 
-void Box3DPhysicsServer3D::shape_set_custom_solver_bias(RID, real_t) {
-	B3_TODO();
-}
-
-real_t Box3DPhysicsServer3D::shape_get_custom_solver_bias(RID) const {
-	B3_TODO();
-	return 0;
-}
-
 void Box3DPhysicsServer3D::space_set_debug_contacts(RID, int) {
 	B3_TODO();
 }

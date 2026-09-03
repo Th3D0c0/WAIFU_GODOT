@@ -232,16 +232,19 @@ hull land on a `ConcavePolygonShape3D` floor; a pin joint holds its anchor dista
 degree span; a 6DOF linear spring absorbs a 6 N s impulse with a 0.104 m peak
 excursion and returns to its equilibrium pose exactly.
 
-57 `B3_TODO()` stubs remain, and they are not all equal:
+52 `B3_TODO()` stubs remain, and they are not all equal:
 
 - **40 are `soft_body_*`** and are permanent. Box3D has no soft bodies at all, and
   `Project_WAIFU` uses none.
-- **`collide_shape` and `body_set_collision_priority` are reachable from this project**
-  — one call site in the game, one in the vendored `godot-xr-tools` `snap_path.gd` —
-  so they are the next real work.
+- **`collide_shape` is reachable from this project** — `godot-xr-tools`'
+  `function_teleport.gd` uses it to test the landing spot — and is the next real work.
+  It needs contact points between two overlapping shapes, which `b3ShapeDistance`
+  cannot give (GJK degenerates once the shapes interpenetrate), so it means either a
+  per-type dispatch onto the `b3Collide*` manifold functions or routing through
+  `b3World_CollideMover` for the capsule case.
 - The rest are unused here: `world_boundary`, `separation_ray`, `heightmap` and custom
-  shape creation, the `space_*_contacts` debug hooks, `body_*_user_flags`,
-  `body_set_force_integration_callback` and `shape_*_custom_solver_bias`.
+  shape creation, the `space_*_contacts` debug hooks, `body_*_user_flags` and
+  `body_set_force_integration_callback`.
 
 ### First performance numbers
 

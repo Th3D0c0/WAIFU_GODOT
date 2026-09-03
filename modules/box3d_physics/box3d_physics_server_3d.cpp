@@ -114,6 +114,25 @@ void Box3DPhysicsServer3D::shape_set_data(RID p_shape, const Variant &p_data) {
 	}
 }
 
+// Godot's custom solver bias is a Bullet-era knob with no counterpart in a modern
+// solver, so it follows the Jolt backend exactly: the getter reports the default and
+// the setter warns only for a value that would actually mean something. Godot pushes
+// the default on shapes that never asked for it, so warning unconditionally would fire
+// on scenes that have done nothing wrong.
+static constexpr real_t SHAPE_DEFAULT_SOLVER_BIAS = 0.0;
+
+void Box3DPhysicsServer3D::shape_set_custom_solver_bias(RID p_shape, real_t p_bias) {
+	ERR_FAIL_NULL(shape_owner.get_or_null(p_shape));
+	if (!Math::is_equal_approx(p_bias, SHAPE_DEFAULT_SOLVER_BIAS)) {
+		WARN_PRINT_ONCE("Box3D: a custom solver bias on a shape is not supported; the value is ignored.");
+	}
+}
+
+real_t Box3DPhysicsServer3D::shape_get_custom_solver_bias(RID p_shape) const {
+	ERR_FAIL_NULL_V(shape_owner.get_or_null(p_shape), 0);
+	return SHAPE_DEFAULT_SOLVER_BIAS;
+}
+
 Variant Box3DPhysicsServer3D::shape_get_data(RID p_shape) const {
 	const Box3DShape3D *shape = shape_owner.get_or_null(p_shape);
 	ERR_FAIL_NULL_V(shape, Variant());
