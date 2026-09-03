@@ -30,6 +30,7 @@
 
 #include "box3d_physics_server_3d.h"
 
+#include "box3d_area_3d.h"
 #include "box3d_body_3d.h"
 #include "box3d_conversions.h"
 #include "box3d_direct_body_state_3d.h"
@@ -107,6 +108,9 @@ void Box3DPhysicsServer3D::shape_set_data(RID p_shape, const Variant &p_data) {
 	for (Box3DBody3D *body : shape->get_dependents()) {
 		body->shape_changed(shape);
 	}
+	for (Box3DArea3D *area : shape->get_area_dependents()) {
+		area->shape_changed(shape);
+	}
 }
 
 Variant Box3DPhysicsServer3D::shape_get_data(RID p_shape) const {
@@ -158,6 +162,16 @@ RID Box3DPhysicsServer3D::space_create() {
 	Box3DSpace3D *space = memnew(Box3DSpace3D);
 	RID rid = space_owner.make_rid(space);
 	space->set_self(rid);
+
+	// Every Godot space owns a default area, and the world's gravity is delivered
+	// through that area's parameters rather than to the space directly - so it has to
+	// exist from the moment the space does, or a project's gravity setting lands
+	// nowhere. Godot addresses it by the space's own RID; see area_set_param.
+	Box3DArea3D *default_area = area_owner.get_or_null(area_create());
+	ERR_FAIL_NULL_V(default_area, rid);
+	space->set_default_area(default_area);
+	default_area->set_space(space);
+
 	return rid;
 }
 
@@ -486,8 +500,24 @@ void Box3DPhysicsServer3D::free_rid(RID p_rid) {
 				}
 			}
 		}
+		while (!shape->get_area_dependents().is_empty()) {
+			Box3DArea3D *area = *shape->get_area_dependents().begin();
+			for (int i = area->get_shape_count() - 1; i >= 0; i--) {
+				if (area->get_shape(i) == shape) {
+					area->remove_shape(i);
+				}
+			}
+		}
 		shape_owner.free(p_rid);
 		memdelete(shape);
+		return;
+	}
+
+	if (Box3DArea3D *area = area_owner.get_or_null(p_rid)) {
+		area->set_space(nullptr);
+		area->clear_shapes();
+		area_owner.free(p_rid);
+		memdelete(area);
 		return;
 	}
 
@@ -515,6 +545,16 @@ void Box3DPhysicsServer3D::free_rid(RID p_rid) {
 		// goes away rather than left to discover it later.
 		while (!space->get_bodies().is_empty()) {
 			(*space->get_bodies().begin())->set_space(nullptr);
+		}
+		// The default area was created by space_create() and is owned by the space, so
+		// it is destroyed here rather than waiting for a free_rid that never comes.
+		Box3DArea3D *default_area = space->get_default_area();
+		while (!space->get_areas().is_empty()) {
+			(*space->get_areas().begin())->set_space(nullptr);
+		}
+		if (default_area != nullptr) {
+			area_owner.free(default_area->get_self());
+			memdelete(default_area);
 		}
 		active_spaces.erase(space);
 		space_owner.free(p_rid);
@@ -732,4 +772,190 @@ real_t Box3DPhysicsServer3D::cone_twist_joint_get_param(RID p_joint, ConeTwistJo
 	const Box3DJoint3D *joint = joint_owner.get_or_null(p_joint);
 	ERR_FAIL_NULL_V(joint, 0);
 	return joint->get_cone_twist_param(p_param);
+}
+
+/* AREAS */
+
+RID Box3DPhysicsServer3D::area_create() {
+	Box3DArea3D *area = memnew(Box3DArea3D);
+	RID rid = area_owner.make_rid(area);
+	area->set_self(rid);
+	return rid;
+}
+
+void Box3DPhysicsServer3D::area_set_space(RID p_area, RID p_space) {
+	Box3DArea3D *area = area_owner.get_or_null(p_area);
+	ERR_FAIL_NULL(area);
+
+	Box3DSpace3D *space = nullptr;
+	if (p_space.is_valid()) {
+		space = space_owner.get_or_null(p_space);
+		ERR_FAIL_NULL(space);
+	}
+	area->set_space(space);
+}
+
+RID Box3DPhysicsServer3D::area_get_space(RID p_area) const {
+	const Box3DArea3D *area = area_owner.get_or_null(p_area);
+	ERR_FAIL_NULL_V(area, RID());
+	const Box3DSpace3D *space = area->get_space();
+	return space != nullptr ? space->get_self() : RID();
+}
+
+void Box3DPhysicsServer3D::area_add_shape(RID p_area, RID p_shape, const Transform3D &p_transform, bool p_disabled) {
+	Box3DArea3D *area = area_owner.get_or_null(p_area);
+	ERR_FAIL_NULL(area);
+	Box3DShape3D *shape = shape_owner.get_or_null(p_shape);
+	ERR_FAIL_NULL(shape);
+	area->add_shape(shape, p_transform, p_disabled);
+}
+
+void Box3DPhysicsServer3D::area_set_shape(RID p_area, int p_shape_idx, RID p_shape) {
+	Box3DArea3D *area = area_owner.get_or_null(p_area);
+	ERR_FAIL_NULL(area);
+	Box3DShape3D *shape = shape_owner.get_or_null(p_shape);
+	ERR_FAIL_NULL(shape);
+	area->set_shape(p_shape_idx, shape);
+}
+
+void Box3DPhysicsServer3D::area_set_shape_transform(RID p_area, int p_shape_idx, const Transform3D &p_transform) {
+	Box3DArea3D *area = area_owner.get_or_null(p_area);
+	ERR_FAIL_NULL(area);
+	area->set_shape_transform(p_shape_idx, p_transform);
+}
+
+void Box3DPhysicsServer3D::area_set_shape_disabled(RID p_area, int p_shape_idx, bool p_disabled) {
+	Box3DArea3D *area = area_owner.get_or_null(p_area);
+	ERR_FAIL_NULL(area);
+	area->set_shape_disabled(p_shape_idx, p_disabled);
+}
+
+int Box3DPhysicsServer3D::area_get_shape_count(RID p_area) const {
+	const Box3DArea3D *area = area_owner.get_or_null(p_area);
+	ERR_FAIL_NULL_V(area, 0);
+	return area->get_shape_count();
+}
+
+RID Box3DPhysicsServer3D::area_get_shape(RID p_area, int p_shape_idx) const {
+	const Box3DArea3D *area = area_owner.get_or_null(p_area);
+	ERR_FAIL_NULL_V(area, RID());
+	const Box3DShape3D *shape = area->get_shape(p_shape_idx);
+	return shape != nullptr ? shape->get_self() : RID();
+}
+
+Transform3D Box3DPhysicsServer3D::area_get_shape_transform(RID p_area, int p_shape_idx) const {
+	const Box3DArea3D *area = area_owner.get_or_null(p_area);
+	ERR_FAIL_NULL_V(area, Transform3D());
+	return area->get_shape_transform(p_shape_idx);
+}
+
+void Box3DPhysicsServer3D::area_remove_shape(RID p_area, int p_shape_idx) {
+	Box3DArea3D *area = area_owner.get_or_null(p_area);
+	ERR_FAIL_NULL(area);
+	area->remove_shape(p_shape_idx);
+}
+
+void Box3DPhysicsServer3D::area_clear_shapes(RID p_area) {
+	Box3DArea3D *area = area_owner.get_or_null(p_area);
+	ERR_FAIL_NULL(area);
+	area->clear_shapes();
+}
+
+void Box3DPhysicsServer3D::area_attach_object_instance_id(RID p_area, ObjectID p_id) {
+	Box3DArea3D *area = area_owner.get_or_null(p_area);
+	ERR_FAIL_NULL(area);
+	area->set_instance_id(p_id);
+}
+
+ObjectID Box3DPhysicsServer3D::area_get_object_instance_id(RID p_area) const {
+	const Box3DArea3D *area = area_owner.get_or_null(p_area);
+	ERR_FAIL_NULL_V(area, ObjectID());
+	return area->get_instance_id();
+}
+
+void Box3DPhysicsServer3D::area_set_param(RID p_area, AreaParameter p_param, const Variant &p_value) {
+	// Godot addresses a space's default area by the space's own RID, which is how the
+	// world's gravity arrives before any Area3D exists.
+	if (Box3DSpace3D *space = space_owner.get_or_null(p_area)) {
+		Box3DArea3D *area = space->get_default_area();
+		ERR_FAIL_NULL(area);
+		area->set_param(p_param, p_value);
+		return;
+	}
+
+	Box3DArea3D *area = area_owner.get_or_null(p_area);
+	ERR_FAIL_NULL(area);
+	area->set_param(p_param, p_value);
+}
+
+Variant Box3DPhysicsServer3D::area_get_param(RID p_area, AreaParameter p_param) const {
+	if (const Box3DSpace3D *space = space_owner.get_or_null(p_area)) {
+		const Box3DArea3D *area = space->get_default_area();
+		ERR_FAIL_NULL_V(area, Variant());
+		return area->get_param(p_param);
+	}
+
+	const Box3DArea3D *area = area_owner.get_or_null(p_area);
+	ERR_FAIL_NULL_V(area, Variant());
+	return area->get_param(p_param);
+}
+
+void Box3DPhysicsServer3D::area_set_transform(RID p_area, const Transform3D &p_transform) {
+	Box3DArea3D *area = area_owner.get_or_null(p_area);
+	ERR_FAIL_NULL(area);
+	area->set_transform(p_transform);
+}
+
+Transform3D Box3DPhysicsServer3D::area_get_transform(RID p_area) const {
+	const Box3DArea3D *area = area_owner.get_or_null(p_area);
+	ERR_FAIL_NULL_V(area, Transform3D());
+	return area->get_transform();
+}
+
+void Box3DPhysicsServer3D::area_set_collision_layer(RID p_area, uint32_t p_layer) {
+	Box3DArea3D *area = area_owner.get_or_null(p_area);
+	ERR_FAIL_NULL(area);
+	area->set_collision_layer(p_layer);
+}
+
+uint32_t Box3DPhysicsServer3D::area_get_collision_layer(RID p_area) const {
+	const Box3DArea3D *area = area_owner.get_or_null(p_area);
+	ERR_FAIL_NULL_V(area, 0);
+	return area->get_collision_layer();
+}
+
+void Box3DPhysicsServer3D::area_set_collision_mask(RID p_area, uint32_t p_mask) {
+	Box3DArea3D *area = area_owner.get_or_null(p_area);
+	ERR_FAIL_NULL(area);
+	area->set_collision_mask(p_mask);
+}
+
+uint32_t Box3DPhysicsServer3D::area_get_collision_mask(RID p_area) const {
+	const Box3DArea3D *area = area_owner.get_or_null(p_area);
+	ERR_FAIL_NULL_V(area, 0);
+	return area->get_collision_mask();
+}
+
+void Box3DPhysicsServer3D::area_set_monitorable(RID p_area, bool p_monitorable) {
+	Box3DArea3D *area = area_owner.get_or_null(p_area);
+	ERR_FAIL_NULL(area);
+	area->set_monitorable(p_monitorable);
+}
+
+void Box3DPhysicsServer3D::area_set_ray_pickable(RID p_area, bool p_enable) {
+	Box3DArea3D *area = area_owner.get_or_null(p_area);
+	ERR_FAIL_NULL(area);
+	area->set_ray_pickable(p_enable);
+}
+
+void Box3DPhysicsServer3D::area_set_monitor_callback(RID p_area, const Callable &p_callback) {
+	Box3DArea3D *area = area_owner.get_or_null(p_area);
+	ERR_FAIL_NULL(area);
+	area->set_monitor_callback(p_callback);
+}
+
+void Box3DPhysicsServer3D::area_set_area_monitor_callback(RID p_area, const Callable &p_callback) {
+	Box3DArea3D *area = area_owner.get_or_null(p_area);
+	ERR_FAIL_NULL(area);
+	area->set_area_monitor_callback(p_callback);
 }

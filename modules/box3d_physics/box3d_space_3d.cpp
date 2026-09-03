@@ -30,6 +30,7 @@
 
 #include "box3d_space_3d.h"
 
+#include "box3d_area_3d.h"
 #include "box3d_body_3d.h"
 #include "box3d_conversions.h"
 #include "box3d_direct_body_state_3d.h"
@@ -125,17 +126,85 @@ void Box3DSpace3D::call_queries() {
 	// exactly what the move-event list is: b3World_GetBodyEvents returns one entry per
 	// body whose transform changed during the step, so a world of mostly sleeping
 	// bodies costs nothing here.
+	_flush_sensor_events();
+
 	const b3BodyEvents events = b3World_GetBodyEvents(world_id);
 	for (int i = 0; i < events.moveCount; i++) {
 		const b3BodyMoveEvent &event = events.moveEvents[i];
-		Box3DBody3D *body = static_cast<Box3DBody3D *>(event.userData);
-		if (body == nullptr) {
+		Box3DCollisionObject3D *object = static_cast<Box3DCollisionObject3D *>(event.userData);
+		// Areas are kinematic bodies, so they produce move events too. Reading one as a
+		// Box3DBody3D pulls a Callable out of the middle of a different object, which
+		// is why the pointer is tagged rather than assumed.
+		if (object == nullptr || object->is_area()) {
 			continue;
 		}
+		Box3DBody3D *body = static_cast<Box3DBody3D *>(object);
 
 		const Callable &callback = body->get_state_sync_callback();
 		if (callback.is_valid()) {
 			callback.call(body->get_direct_state());
+		}
+	}
+}
+
+// Turns Box3D's sensor begin/end touch events into Godot's two area callbacks.
+//
+// Box3D reports overlaps per *shape pair*, which is the same granularity Godot's
+// callbacks take, so the events map across one for one. The work here is resolving
+// each side back to the object that owns it and deciding which of the two callbacks
+// it belongs on: a visitor that is itself an area goes to the area monitor, anything
+// else to the body monitor.
+void Box3DSpace3D::_flush_sensor_events() {
+	const b3SensorEvents events = b3World_GetSensorEvents(world_id);
+
+	for (int i = 0; i < events.beginCount + events.endCount; i++) {
+		const bool entering = i < events.beginCount;
+		const b3ShapeId sensor_shape = entering ? events.beginEvents[i].sensorShapeId
+												: events.endEvents[i - events.beginCount].sensorShapeId;
+		const b3ShapeId visitor_shape = entering ? events.beginEvents[i].visitorShapeId
+												 : events.endEvents[i - events.beginCount].visitorShapeId;
+
+		// An end event is explicitly allowed to name a shape that has since been
+		// destroyed (types.h), so both sides are checked before being dereferenced.
+		if (!b3Shape_IsValid(sensor_shape) || !b3Shape_IsValid(visitor_shape)) {
+			continue;
+		}
+
+		const b3BodyId sensor_body = b3Shape_GetBody(sensor_shape);
+		const b3BodyId visitor_body = b3Shape_GetBody(visitor_shape);
+		if (!B3_IS_NON_NULL(sensor_body) || !B3_IS_NON_NULL(visitor_body)) {
+			continue;
+		}
+
+		// Only an area owns sensor shapes, so the sensor side resolves to one.
+		Box3DCollisionObject3D *sensor_object = static_cast<Box3DCollisionObject3D *>(b3Body_GetUserData(sensor_body));
+		if (sensor_object == nullptr || !sensor_object->is_area()) {
+			continue;
+		}
+		Box3DArea3D *area = static_cast<Box3DArea3D *>(sensor_object);
+
+		Box3DCollisionObject3D *visitor = static_cast<Box3DCollisionObject3D *>(b3Body_GetUserData(visitor_body));
+		if (visitor == nullptr) {
+			continue;
+		}
+
+		const PhysicsServer3D::AreaBodyStatus status =
+				entering ? PhysicsServer3D::AREA_BODY_ADDED : PhysicsServer3D::AREA_BODY_REMOVED;
+		const int area_shape_index = area->find_shape_index(sensor_shape);
+
+		if (visitor->is_area()) {
+			Box3DArea3D *other = static_cast<Box3DArea3D *>(visitor);
+			// Godot's monitorable flag is about whether other areas may see this one.
+			// Box3D has no equivalent, so it is enforced at report time.
+			if (!other->is_monitorable()) {
+				continue;
+			}
+			area->report_area(status, other->get_self(), other->get_instance_id(),
+					other->find_shape_index(visitor_shape), area_shape_index);
+		} else {
+			Box3DBody3D *body = static_cast<Box3DBody3D *>(visitor);
+			area->report_body(status, body->get_self(), body->get_instance_id(),
+					body->find_shape_index(visitor_shape), area_shape_index);
 		}
 	}
 }

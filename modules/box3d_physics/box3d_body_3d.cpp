@@ -67,7 +67,7 @@ void Box3DBody3D::_build() {
 	body_def.isBullet = ccd_enabled;
 	// The Box3D body points back at its owner so move events, which carry only
 	// userData and a transform, can be resolved without a side table.
-	body_def.userData = this;
+	body_def.userData = static_cast<Box3DCollisionObject3D *>(this);
 
 	if (mode == PhysicsServer3D::BODY_MODE_RIGID_LINEAR) {
 		body_def.motionLocks.angularX = true;
@@ -137,6 +137,10 @@ void Box3DBody3D::_rebuild_shapes() {
 		shape_def.filter.categoryBits = collision_layer;
 		shape_def.filter.maskBits = collision_mask;
 		shape_def.userData = this;
+		// A sensor only reports a visitor whose own shape has sensor events enabled -
+		// the flag applies to both sides and is false by default (types.h:489). Without
+		// this every Area3D in the scene silently detects nothing.
+		shape_def.enableSensorEvents = true;
 		// Deferred so a body with several shapes recomputes its mass once, below.
 		shape_def.updateBodyMass = false;
 
@@ -459,6 +463,15 @@ Box3DShape3D *Box3DBody3D::get_shape(int p_index) const {
 Transform3D Box3DBody3D::get_shape_transform(int p_index) const {
 	ERR_FAIL_INDEX_V(p_index, (int)shapes.size(), Transform3D());
 	return shapes[p_index].transform;
+}
+
+int Box3DBody3D::find_shape_index(b3ShapeId p_id) const {
+	for (uint32_t i = 0; i < shapes.size(); i++) {
+		if (B3_ID_EQUALS(shapes[i].id, p_id)) {
+			return (int)i;
+		}
+	}
+	return 0;
 }
 
 void Box3DBody3D::shape_changed(Box3DShape3D *p_shape) {

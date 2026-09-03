@@ -34,6 +34,7 @@
 #include "core/templates/rid_owner.h"
 #include "servers/physics_3d/physics_server_3d.h"
 
+class Box3DArea3D;
 class Box3DBody3D;
 class Box3DJoint3D;
 class Box3DShape3D;
@@ -42,6 +43,7 @@ class Box3DSpace3D;
 class Box3DPhysicsServer3D : public PhysicsServer3D {
 	GDCLASS(Box3DPhysicsServer3D, PhysicsServer3D);
 
+	mutable RID_PtrOwner<Box3DArea3D> area_owner;
 	mutable RID_PtrOwner<Box3DShape3D> shape_owner;
 	mutable RID_PtrOwner<Box3DSpace3D> space_owner;
 	mutable RID_PtrOwner<Box3DBody3D> body_owner;
@@ -80,32 +82,32 @@ public:
 	virtual void space_set_debug_contacts(RID p_space, int p_max_contacts) override; // TODO
 	virtual Vector<Vector3> space_get_contacts(RID p_space) const override; // TODO
 	virtual int space_get_contact_count(RID p_space) const override; // TODO
-	virtual RID area_create() override; // TODO
-	virtual void area_set_space(RID p_area, RID p_space) override; // TODO
-	virtual RID area_get_space(RID p_area) const override; // TODO
-	virtual void area_add_shape(RID p_area, RID p_shape, const Transform3D &p_transform, bool p_disabled) override; // TODO
-	virtual void area_set_shape(RID p_area, int p_shape_idx, RID p_shape) override; // TODO
-	virtual void area_set_shape_transform(RID p_area, int p_shape_idx, const Transform3D &p_transform) override; // TODO
-	virtual int area_get_shape_count(RID p_area) const override; // TODO
-	virtual RID area_get_shape(RID p_area, int p_shape_idx) const override; // TODO
-	virtual Transform3D area_get_shape_transform(RID p_area, int p_shape_idx) const override; // TODO
-	virtual void area_remove_shape(RID p_area, int p_shape_idx) override; // TODO
-	virtual void area_clear_shapes(RID p_area) override; // TODO
-	virtual void area_set_shape_disabled(RID p_area, int p_shape_idx, bool p_disabled) override; // TODO
-	virtual void area_attach_object_instance_id(RID p_area, ObjectID p_id) override; // TODO
-	virtual ObjectID area_get_object_instance_id(RID p_area) const override; // TODO
-	virtual void area_set_param(RID p_area, AreaParameter p_param, const Variant &p_value) override; // TODO
-	virtual void area_set_transform(RID p_area, const Transform3D &p_transform) override; // TODO
-	virtual Variant area_get_param(RID p_parea, AreaParameter p_param) const override; // TODO
-	virtual Transform3D area_get_transform(RID p_area) const override; // TODO
-	virtual void area_set_collision_layer(RID p_area, uint32_t p_layer) override; // TODO
-	virtual uint32_t area_get_collision_layer(RID p_area) const override; // TODO
-	virtual void area_set_collision_mask(RID p_area, uint32_t p_mask) override; // TODO
-	virtual uint32_t area_get_collision_mask(RID p_area) const override; // TODO
-	virtual void area_set_monitorable(RID p_area, bool p_monitorable) override; // TODO
-	virtual void area_set_monitor_callback(RID p_area, const Callable &p_callback) override; // TODO
-	virtual void area_set_area_monitor_callback(RID p_area, const Callable &p_callback) override; // TODO
-	virtual void area_set_ray_pickable(RID p_area, bool p_enable) override; // TODO
+	virtual RID area_create() override;
+	virtual void area_set_space(RID p_area, RID p_space) override;
+	virtual RID area_get_space(RID p_area) const override;
+	virtual void area_add_shape(RID p_area, RID p_shape, const Transform3D &p_transform, bool p_disabled) override;
+	virtual void area_set_shape(RID p_area, int p_shape_idx, RID p_shape) override;
+	virtual void area_set_shape_transform(RID p_area, int p_shape_idx, const Transform3D &p_transform) override;
+	virtual int area_get_shape_count(RID p_area) const override;
+	virtual RID area_get_shape(RID p_area, int p_shape_idx) const override;
+	virtual Transform3D area_get_shape_transform(RID p_area, int p_shape_idx) const override;
+	virtual void area_remove_shape(RID p_area, int p_shape_idx) override;
+	virtual void area_clear_shapes(RID p_area) override;
+	virtual void area_set_shape_disabled(RID p_area, int p_shape_idx, bool p_disabled) override;
+	virtual void area_attach_object_instance_id(RID p_area, ObjectID p_id) override;
+	virtual ObjectID area_get_object_instance_id(RID p_area) const override;
+	virtual void area_set_param(RID p_area, AreaParameter p_param, const Variant &p_value) override;
+	virtual void area_set_transform(RID p_area, const Transform3D &p_transform) override;
+	virtual Variant area_get_param(RID p_parea, AreaParameter p_param) const override;
+	virtual Transform3D area_get_transform(RID p_area) const override;
+	virtual void area_set_collision_layer(RID p_area, uint32_t p_layer) override;
+	virtual uint32_t area_get_collision_layer(RID p_area) const override;
+	virtual void area_set_collision_mask(RID p_area, uint32_t p_mask) override;
+	virtual uint32_t area_get_collision_mask(RID p_area) const override;
+	virtual void area_set_monitorable(RID p_area, bool p_monitorable) override;
+	virtual void area_set_monitor_callback(RID p_area, const Callable &p_callback) override;
+	virtual void area_set_area_monitor_callback(RID p_area, const Callable &p_callback) override;
+	virtual void area_set_ray_pickable(RID p_area, bool p_enable) override;
 	virtual RID body_create() override;
 	virtual void body_set_space(RID p_body, RID p_space) override;
 	virtual RID body_get_space(RID p_body) const override;

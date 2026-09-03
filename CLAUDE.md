@@ -274,6 +274,32 @@ Two axis conventions differ and are converted rather than assumed:
 - **Hinge and slider** happen to agree already — revolute is Z on both, prismatic and
   Godot's slider are both X — so those need no conversion.
 
+### Areas are sensors, and userData is shared
+
+`Area3D` maps onto a kinematic Box3D body whose shapes carry `isSensor`. Overlaps
+arrive as begin/end touch events after the step and are diffed into Godot's two
+five-argument callbacks. Three things about that:
+
+- **`enableSensorEvents` is false by default even for sensors, and applies to both
+  sides** (`types.h:485-489`). `Box3DBody3D` therefore sets it on every shape it
+  creates. Without that every area in the scene silently detects nothing.
+- **Sensors are not excluded from each other** — `sensor.c:118-133` checks
+  `enableSensorEvents`, same-body and the collision filter, but never `isSensor` — so
+  area-to-area monitoring works with no extra machinery. Godot's `monitorable` flag has
+  no Box3D counterpart and is enforced when the overlap is reported.
+- **A body's and an area's `userData` occupy the same slot**, and an area is a
+  *kinematic body*, so it emits move events too. Casting a move event's `userData`
+  straight to `Box3DBody3D *` reads a `Callable` out of the middle of a `Box3DArea3D`.
+  That is why both derive from `Box3DCollisionObject3D`, whose only job is to carry a
+  type tag that makes the pointer identifiable before it is cast. Any new consumer of
+  a Box3D `userData` must check `is_area()` first.
+
+Per-area gravity and damping overrides for bodies *inside* an area are not implemented;
+those areas report overlaps correctly but do not alter what is inside them. The space's
+default area is the exception, because Godot routes the world's gravity through it —
+which is why `space_create()` makes one and `area_set_param` accepts the space's own
+RID as an alias for it.
+
 Finally, **creating a joint does not wake its bodies.** A spring or motor attached to a
 sleeping body does nothing at all until something unrelated wakes it, which reads
 exactly like the joint being ignored. `_build()` ends with `b3Joint_WakeBodies()`.

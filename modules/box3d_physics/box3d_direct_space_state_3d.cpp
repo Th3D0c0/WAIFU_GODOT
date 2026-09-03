@@ -30,6 +30,7 @@
 
 #include "box3d_direct_space_state_3d.h"
 
+#include "box3d_area_3d.h"
 #include "box3d_body_3d.h"
 #include "box3d_conversions.h"
 #include "box3d_space_3d.h"
@@ -69,24 +70,35 @@ bool Box3DDirectSpaceState3D::intersect_ray(const RayParameters &p_parameters, R
 	// A shape knows its body through Box3D, and the body's userData is the wrapper
 	// that owns the Godot-side identity.
 	const b3BodyId hit_body = b3Shape_GetBody(hit.shapeId);
-	Box3DBody3D *body = B3_IS_NON_NULL(hit_body) ? static_cast<Box3DBody3D *>(b3Body_GetUserData(hit_body)) : nullptr;
-	if (body == nullptr) {
+	Box3DCollisionObject3D *object = B3_IS_NON_NULL(hit_body)
+			? static_cast<Box3DCollisionObject3D *>(b3Body_GetUserData(hit_body))
+			: nullptr;
+	// Godot's ray defaults to bodies only, and areas share the same userData slot, so
+	// the tag decides whether this hit is eligible at all.
+	if (object == nullptr) {
 		return false;
 	}
+	if (object->is_area() && !p_parameters.collide_with_areas) {
+		return false;
+	}
+	if (!object->is_area() && !p_parameters.collide_with_bodies) {
+		return false;
+	}
+	Box3DBody3D *body = object->is_area() ? nullptr : static_cast<Box3DBody3D *>(object);
 
 	// Godot filters by RID after the fact rather than during traversal, and pick rays
 	// additionally honor the per-body pickable flag.
-	if (p_parameters.exclude.has(body->get_self())) {
+	if (p_parameters.exclude.has(object->get_self())) {
 		return false;
 	}
-	if (p_parameters.pick_ray && !body->is_ray_pickable()) {
+	if (p_parameters.pick_ray && body != nullptr && !body->is_ray_pickable()) {
 		return false;
 	}
 
 	r_result.position = to_godot(hit.point);
 	r_result.normal = to_godot(hit.normal);
-	r_result.rid = body->get_self();
-	r_result.collider_id = body->get_instance_id();
+	r_result.rid = object->get_self();
+	r_result.collider_id = object->get_instance_id();
 	r_result.collider = r_result.collider_id.is_valid() ? ObjectDB::get_instance(r_result.collider_id) : nullptr;
 	// Box3D reports which child shape was hit, not which of Godot's shape slots it
 	// came from; the two indices coincide only for single-shape bodies, so this is

@@ -37,6 +37,7 @@
 
 #include <box3d/box3d.h>
 
+class Box3DArea3D;
 class Box3DBody3D;
 class Box3DDirectSpaceState3D;
 
@@ -58,9 +59,14 @@ class Box3DSpace3D {
 	real_t last_step = 0.0;
 
 	HashSet<Box3DBody3D *> bodies;
+	HashSet<Box3DArea3D *> areas;
+	// Godot gives every space a default area and routes the world's gravity through
+	// its parameters, so the space has to know which one that is.
+	Box3DArea3D *default_area = nullptr;
 	Box3DDirectSpaceState3D *direct_state = nullptr;
 
 	void _apply_gravity();
+	void _flush_sensor_events();
 
 public:
 	void set_self(const RID &p_self) { self = p_self; }
@@ -80,6 +86,18 @@ public:
 	void set_gravity_magnitude(real_t p_magnitude);
 	Vector3 get_gravity_vector() const { return gravity_vector; }
 	real_t get_gravity_magnitude() const { return gravity_magnitude; }
+
+	void set_default_area(Box3DArea3D *p_area) { default_area = p_area; }
+	Box3DArea3D *get_default_area() const { return default_area; }
+
+	void add_area(Box3DArea3D *p_area) { areas.insert(p_area); }
+	void remove_area(Box3DArea3D *p_area) {
+		areas.erase(p_area);
+		if (default_area == p_area) {
+			default_area = nullptr;
+		}
+	}
+	const HashSet<Box3DArea3D *> &get_areas() const { return areas; }
 
 	void add_body(Box3DBody3D *p_body) { bodies.insert(p_body); }
 	void remove_body(Box3DBody3D *p_body) { bodies.erase(p_body); }

@@ -203,4 +203,5 @@ Box3DShape3D::~Box3DShape3D() {
 	// a body outliving a shape it still references - which would dangle on the next
 	// rebuild rather than fail loudly later.
 	ERR_FAIL_COND_MSG(!dependents.is_empty(), "Box3D: a shape was freed while bodies still referenced it.");
+	ERR_FAIL_COND_MSG(!area_dependents.is_empty(), "Box3D: a shape was freed while areas still referenced it.");
 }

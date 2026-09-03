@@ -38,6 +38,7 @@
 #include <box3d/box3d.h>
 #include <box3d/collision.h>
 
+class Box3DArea3D;
 class Box3DBody3D;
 
 // A Godot collision shape, which is not the same object a Box3D shape is.
@@ -81,6 +82,7 @@ private:
 	Vector<Vector3> faces;
 
 	HashSet<Box3DBody3D *> dependents;
+	HashSet<Box3DArea3D *> area_dependents;
 
 public:
 	void set_self(const RID &p_self) { self = p_self; }
@@ -104,6 +106,10 @@ public:
 	void add_dependent(Box3DBody3D *p_body) { dependents.insert(p_body); }
 	void remove_dependent(Box3DBody3D *p_body) { dependents.erase(p_body); }
 	const HashSet<Box3DBody3D *> &get_dependents() const { return dependents; }
+
+	void add_area_dependent(Box3DArea3D *p_area) { area_dependents.insert(p_area); }
+	void remove_area_dependent(Box3DArea3D *p_area) { area_dependents.erase(p_area); }
+	const HashSet<Box3DArea3D *> &get_area_dependents() const { return area_dependents; }
 
 	// Instantiates this shape onto a body at a local transform, returning the Box3D
 	// shape id. `r_owned_hull` and `r_owned_mesh` receive any heap geometry the caller
