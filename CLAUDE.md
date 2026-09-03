@@ -200,10 +200,10 @@ each needs a decision before the corresponding stubs can be written:
 
 | Godot | Box3D | Where it bites |
 |---|---|---|
-| `Generic6DOFJoint3D` | no 6-DOF constraint | `Player.tscn` has 5 |
-| `PinJoint3D` | `b3SphericalJoint` with limits off | fine |
-| `ConeTwistJoint3D` | `b3SphericalJoint` cone + twist | fine, arguably better |
-| `HingeJoint3D` / `SliderJoint3D` | revolute / prismatic | fine |
+| `Generic6DOFJoint3D` | `b3MotorJoint` — spring/motor work, **per-axis limits do not** | `Player.tscn` has 5 |
+| `PinJoint3D` | `b3SphericalJoint` with limits off | works |
+| `ConeTwistJoint3D` | `b3SphericalJoint` cone + twist | works |
+| `HingeJoint3D` / `SliderJoint3D` | revolute / prismatic | limits + motor only |
 | `CylinderShape3D` | ~~none~~ `b3CreateCylinder` tessellates one, 16 sides | resolved, approximate |
 | `SoftBody3D` | none at all | 40 of the 249 methods can only ever be stubs |
 | live shape scale | scale is baked at hull/mesh creation | rescaling means rebaking |
@@ -214,10 +214,14 @@ exactly what the `jolt_physics` patch in the rebase checklist had to expose by h
 
 ### What actually runs today
 
-Shapes, bodies, spaces, stepping, transform sync and downward raycasts. A box and a
+Shapes, bodies, spaces, stepping, transform sync, downward raycasts and all five
+joint types. A box and a
 sphere dropped from 5 m rest at y=0.499 against a 1 mm soft-solver penetration, and a
 capsule, a cylinder and a convex hull land correctly on a `ConcavePolygonShape3D`
-floor. Joints, areas, contact reporting, `body_test_motion` and the remaining queries
+floor. A pin joint holds its anchor distance to 1.503 against Jolt's 1.503, a cone
+twist limits swing to 29.9 degrees against a 30 degree span, and a 6DOF linear spring
+absorbs a 6 N s impulse with a 0.104 m peak excursion and returns to its equilibrium
+pose exactly. Areas, contact reporting, `body_test_motion` and the remaining queries
 are still stubs — run a scene and `B3_TODO()` names them.
 
 Three Box3D behaviors that are not guessable from the headers and cost a debug cycle
@@ -234,6 +238,45 @@ each if rediscovered:
 - **Vertex welding is skipped unless `weldTolerance > 0`** (`mesh.c:1579`), so setting
   `weldVertices = true` alone does nothing and the internal-edge handling that depends
   on it never engages.
+
+### Joints, and what the 6DOF mapping can and cannot do
+
+`Generic6DOFJoint3D` maps onto `b3MotorJointDef`, which is the one place Box3D is
+better suited to this game than Jolt was: `linearHertz`/`angularHertz` with
+`maxSpringForce`/`maxSpringTorque` are exactly the frequency-based drive with a real
+torque ceiling that the `jolt_physics` patch had to expose by hand.
+
+Three things about that mapping are worth knowing before tuning a hand against it:
+
+- **A 6DOF spring holds the pose the joint was built at.** Godot derives the local
+  frames from the joint node's transform relative to each body, so at construction the
+  frames are already coincident and the spring separation is zero. The drive returns
+  the body to *that* pose after a disturbance; it does not pull bodies together. Move
+  the equilibrium with `G6DOF_JOINT_*_SPRING_EQUILIBRIUM_POINT`, which rebuilds the
+  joint with a displaced frame A.
+- **Per-axis limits are not supported and warn once.** Box3D's motor joint constrains
+  all three axes with one scalar and has no limit range at all. An axis is a spring, a
+  velocity motor, or rigid — never "free between -30 and +30 degrees". Where a limit is
+  the point, use `ConeTwistJoint3D` (cone + twist), `HingeJoint3D` or `SliderJoint3D`,
+  all of which map onto Box3D joints that do have limits.
+- **Godot's spring parameter is a stiffness, Box3D's is a frequency.** The conversion
+  `f = sqrt(k/m) / 2*pi` needs a mass, so it happens at build time from the lighter
+  dynamic endpoint. For the angular case the true relation needs the inertia tensor
+  about the joint axis, so mass stands in for it and the angular frequency is only
+  approximate - the main reason a tuned Jolt hand will not feel identical here.
+
+Two axis conventions differ and are converted rather than assumed:
+
+- **Cone twist**: Godot twists about the frame's **X** axis
+  (`godot_cone_twist_joint_3d.cpp:117` takes basis column 0), Box3D about **Z**
+  (`types.h:881,887`). `cone_twist_frame()` relabels the frame. Without it a ragdoll
+  limb bends around the wrong axis.
+- **Hinge and slider** happen to agree already — revolute is Z on both, prismatic and
+  Godot's slider are both X — so those need no conversion.
+
+Finally, **creating a joint does not wake its bodies.** A spring or motor attached to a
+sleeping body does nothing at all until something unrelated wakes it, which reads
+exactly like the joint being ignored. `_build()` ends with `b3Joint_WakeBodies()`.
 
 ## Additive modules over core patches — important
 

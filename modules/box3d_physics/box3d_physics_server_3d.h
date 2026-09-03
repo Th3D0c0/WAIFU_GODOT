@@ -35,6 +35,7 @@
 #include "servers/physics_3d/physics_server_3d.h"
 
 class Box3DBody3D;
+class Box3DJoint3D;
 class Box3DShape3D;
 class Box3DSpace3D;
 
@@ -44,6 +45,7 @@ class Box3DPhysicsServer3D : public PhysicsServer3D {
 	mutable RID_PtrOwner<Box3DShape3D> shape_owner;
 	mutable RID_PtrOwner<Box3DSpace3D> space_owner;
 	mutable RID_PtrOwner<Box3DBody3D> body_owner;
+	mutable RID_PtrOwner<Box3DJoint3D> joint_owner;
 
 	bool active = true;
 	bool flushing_queries = false;
@@ -205,37 +207,37 @@ public:
 	virtual void soft_body_remove_all_pinned_points(RID p_body) override; // TODO
 	virtual void soft_body_pin_point(RID p_body, int p_point_index, bool p_pin) override; // TODO
 	virtual bool soft_body_is_point_pinned(RID p_body, int p_point_index) const override; // TODO
-	virtual RID joint_create() override; // TODO
-	virtual void joint_clear(RID p_joint) override; // TODO
-	virtual JointType joint_get_type(RID p_joint) const override; // TODO
-	virtual void joint_set_solver_priority(RID p_joint, int p_priority) override; // TODO
-	virtual int joint_get_solver_priority(RID p_joint) const override; // TODO
-	virtual void joint_disable_collisions_between_bodies(RID p_joint, bool p_disable) override; // TODO
-	virtual bool joint_is_disabled_collisions_between_bodies(RID p_joint) const override; // TODO
-	virtual void joint_make_pin(RID p_joint, RID p_body_A, const Vector3 &p_local_A, RID p_body_B, const Vector3 &p_local_B) override; // TODO
+	virtual RID joint_create() override;
+	virtual void joint_clear(RID p_joint) override;
+	virtual JointType joint_get_type(RID p_joint) const override;
+	virtual void joint_set_solver_priority(RID p_joint, int p_priority) override;
+	virtual int joint_get_solver_priority(RID p_joint) const override;
+	virtual void joint_disable_collisions_between_bodies(RID p_joint, bool p_disable) override;
+	virtual bool joint_is_disabled_collisions_between_bodies(RID p_joint) const override;
+	virtual void joint_make_pin(RID p_joint, RID p_body_A, const Vector3 &p_local_A, RID p_body_B, const Vector3 &p_local_B) override;
 	virtual void pin_joint_set_param(RID p_joint, PinJointParam p_param, real_t p_value) override; // TODO
 	virtual real_t pin_joint_get_param(RID p_joint, PinJointParam p_param) const override; // TODO
 	virtual void pin_joint_set_local_a(RID p_joint, const Vector3 &p_A) override; // TODO
 	virtual Vector3 pin_joint_get_local_a(RID p_joint) const override; // TODO
 	virtual void pin_joint_set_local_b(RID p_joint, const Vector3 &p_B) override; // TODO
 	virtual Vector3 pin_joint_get_local_b(RID p_joint) const override; // TODO
-	virtual void joint_make_hinge(RID p_joint, RID p_body_A, const Transform3D &p_hinge_A, RID p_body_B, const Transform3D &p_hinge_B) override; // TODO
-	virtual void joint_make_hinge_simple(RID p_joint, RID p_body_A, const Vector3 &p_pivot_A, const Vector3 &p_axis_A, RID p_body_B, const Vector3 &p_pivot_B, const Vector3 &p_axis_B) override; // TODO
-	virtual void hinge_joint_set_param(RID p_joint, HingeJointParam p_param, real_t p_value) override; // TODO
-	virtual real_t hinge_joint_get_param(RID p_joint, HingeJointParam p_param) const override; // TODO
-	virtual void hinge_joint_set_flag(RID p_joint, HingeJointFlag p_flag, bool p_enabled) override; // TODO
-	virtual bool hinge_joint_get_flag(RID p_joint, HingeJointFlag p_flag) const override; // TODO
-	virtual void joint_make_slider(RID p_joint, RID p_body_A, const Transform3D &p_local_frame_A, RID p_body_B, const Transform3D &p_local_frame_B) override; // TODO
-	virtual void slider_joint_set_param(RID p_joint, SliderJointParam p_param, real_t p_value) override; // TODO
-	virtual real_t slider_joint_get_param(RID p_joint, SliderJointParam p_param) const override; // TODO
-	virtual void joint_make_cone_twist(RID p_joint, RID p_body_A, const Transform3D &p_local_frame_A, RID p_body_B, const Transform3D &p_local_frame_B) override; // TODO
-	virtual void cone_twist_joint_set_param(RID p_joint, ConeTwistJointParam p_param, real_t p_value) override; // TODO
-	virtual real_t cone_twist_joint_get_param(RID p_joint, ConeTwistJointParam p_param) const override; // TODO
-	virtual void joint_make_generic_6dof(RID p_joint, RID p_body_A, const Transform3D &p_local_frame_A, RID p_body_B, const Transform3D &p_local_frame_B) override; // TODO
-	virtual void generic_6dof_joint_set_param(RID p_joint, Vector3::Axis, G6DOFJointAxisParam p_param, real_t p_value) override; // TODO
-	virtual real_t generic_6dof_joint_get_param(RID p_joint, Vector3::Axis, G6DOFJointAxisParam p_param) const override; // TODO
-	virtual void generic_6dof_joint_set_flag(RID p_joint, Vector3::Axis, G6DOFJointAxisFlag p_flag, bool p_enable) override; // TODO
-	virtual bool generic_6dof_joint_get_flag(RID p_joint, Vector3::Axis, G6DOFJointAxisFlag p_flag) const override; // TODO
+	virtual void joint_make_hinge(RID p_joint, RID p_body_A, const Transform3D &p_hinge_A, RID p_body_B, const Transform3D &p_hinge_B) override;
+	virtual void joint_make_hinge_simple(RID p_joint, RID p_body_A, const Vector3 &p_pivot_A, const Vector3 &p_axis_A, RID p_body_B, const Vector3 &p_pivot_B, const Vector3 &p_axis_B) override;
+	virtual void hinge_joint_set_param(RID p_joint, HingeJointParam p_param, real_t p_value) override;
+	virtual real_t hinge_joint_get_param(RID p_joint, HingeJointParam p_param) const override;
+	virtual void hinge_joint_set_flag(RID p_joint, HingeJointFlag p_flag, bool p_enabled) override;
+	virtual bool hinge_joint_get_flag(RID p_joint, HingeJointFlag p_flag) const override;
+	virtual void joint_make_slider(RID p_joint, RID p_body_A, const Transform3D &p_local_frame_A, RID p_body_B, const Transform3D &p_local_frame_B) override;
+	virtual void slider_joint_set_param(RID p_joint, SliderJointParam p_param, real_t p_value) override;
+	virtual real_t slider_joint_get_param(RID p_joint, SliderJointParam p_param) const override;
+	virtual void joint_make_cone_twist(RID p_joint, RID p_body_A, const Transform3D &p_local_frame_A, RID p_body_B, const Transform3D &p_local_frame_B) override;
+	virtual void cone_twist_joint_set_param(RID p_joint, ConeTwistJointParam p_param, real_t p_value) override;
+	virtual real_t cone_twist_joint_get_param(RID p_joint, ConeTwistJointParam p_param) const override;
+	virtual void joint_make_generic_6dof(RID p_joint, RID p_body_A, const Transform3D &p_local_frame_A, RID p_body_B, const Transform3D &p_local_frame_B) override;
+	virtual void generic_6dof_joint_set_param(RID p_joint, Vector3::Axis, G6DOFJointAxisParam p_param, real_t p_value) override;
+	virtual real_t generic_6dof_joint_get_param(RID p_joint, Vector3::Axis, G6DOFJointAxisParam p_param) const override;
+	virtual void generic_6dof_joint_set_flag(RID p_joint, Vector3::Axis, G6DOFJointAxisFlag p_flag, bool p_enable) override;
+	virtual bool generic_6dof_joint_get_flag(RID p_joint, Vector3::Axis, G6DOFJointAxisFlag p_flag) const override;
 	virtual void free_rid(RID p_rid) override;
 	virtual void set_active(bool p_active) override;
 	virtual void init() override;

@@ -34,6 +34,7 @@
 #include "box3d_conversions.h"
 #include "box3d_direct_body_state_3d.h"
 #include "box3d_direct_space_state_3d.h"
+#include "box3d_joint_3d.h"
 #include "box3d_shape_3d.h"
 #include "box3d_space_3d.h"
 
@@ -41,6 +42,26 @@
 
 // Everything not defined here lives in box3d_physics_server_3d_todo.cpp, which is
 // generated and shrinks as work moves into this file. See box3d_todo.h.
+
+// Box3D's revolute joint rotates about its frame's Z axis, and Godot's HingeJoint3D
+// does too, so joint_make_hinge needs no conversion. joint_make_hinge_simple gives a
+// pivot and an axis instead of a frame, which this turns into a frame whose Z column
+// is that axis; the other two columns only have to complete an orthonormal basis,
+// since a hinge is rotationally symmetric about its own axis.
+static Transform3D _frame_from_axis(const Vector3 &p_pivot, const Vector3 &p_axis) {
+	const Vector3 z = p_axis.normalized();
+	// Any vector not parallel to z seeds the cross products; picking the world axis z
+	// is least aligned with keeps the result well conditioned.
+	const Vector3 seed = Math::abs(z.x) < (real_t)0.9 ? Vector3(1, 0, 0) : Vector3(0, 1, 0);
+	const Vector3 x = seed.cross(z).normalized();
+	const Vector3 y = z.cross(x);
+
+	Basis basis;
+	basis.set_column(Vector3::AXIS_X, x);
+	basis.set_column(Vector3::AXIS_Y, y);
+	basis.set_column(Vector3::AXIS_Z, z);
+	return Transform3D(basis, p_pivot);
+}
 
 /* SHAPES */
 
@@ -470,7 +491,18 @@ void Box3DPhysicsServer3D::free_rid(RID p_rid) {
 		return;
 	}
 
+	if (Box3DJoint3D *joint = joint_owner.get_or_null(p_rid)) {
+		joint_owner.free(p_rid);
+		memdelete(joint);
+		return;
+	}
+
 	if (Box3DBody3D *body = body_owner.get_or_null(p_rid)) {
+		// Joints hold raw pointers to their endpoints, so any joint still attached is
+		// cleared first - which also unregisters it from this body.
+		while (!body->get_joints().is_empty()) {
+			(*body->get_joints().begin())->clear();
+		}
 		body->set_space(nullptr);
 		body->clear_shapes();
 		body_owner.free(p_rid);
@@ -538,4 +570,166 @@ int Box3DPhysicsServer3D::get_process_info(ProcessInfo p_info) {
 	// Box3D exposes these through b3World_GetCounters, which is not plumbed through
 	// yet; reporting zero is honest, whereas a guess would look like real telemetry.
 	return 0;
+}
+
+/* JOINTS */
+
+RID Box3DPhysicsServer3D::joint_create() {
+	Box3DJoint3D *joint = memnew(Box3DJoint3D);
+	RID rid = joint_owner.make_rid(joint);
+	joint->set_self(rid);
+	return rid;
+}
+
+void Box3DPhysicsServer3D::joint_clear(RID p_joint) {
+	Box3DJoint3D *joint = joint_owner.get_or_null(p_joint);
+	ERR_FAIL_NULL(joint);
+	joint->clear();
+}
+
+PhysicsServer3D::JointType Box3DPhysicsServer3D::joint_get_type(RID p_joint) const {
+	const Box3DJoint3D *joint = joint_owner.get_or_null(p_joint);
+	ERR_FAIL_NULL_V(joint, JOINT_TYPE_PIN);
+	const JointType type = joint->get_type();
+	// A joint that has been created but not yet given a shape by one of the
+	// joint_make_* calls reports as a pin, which is what Godot's own backends do.
+	return type == Box3DJoint3D::TYPE_NONE ? JOINT_TYPE_PIN : type;
+}
+
+void Box3DPhysicsServer3D::joint_set_solver_priority(RID p_joint, int p_priority) {
+	Box3DJoint3D *joint = joint_owner.get_or_null(p_joint);
+	ERR_FAIL_NULL(joint);
+	// Recorded only. Box3D's constraint graph orders islands itself and exposes no
+	// per-joint solve priority.
+	joint->set_solver_priority(p_priority);
+}
+
+int Box3DPhysicsServer3D::joint_get_solver_priority(RID p_joint) const {
+	const Box3DJoint3D *joint = joint_owner.get_or_null(p_joint);
+	ERR_FAIL_NULL_V(joint, 0);
+	return joint->get_solver_priority();
+}
+
+void Box3DPhysicsServer3D::joint_disable_collisions_between_bodies(RID p_joint, bool p_disable) {
+	Box3DJoint3D *joint = joint_owner.get_or_null(p_joint);
+	ERR_FAIL_NULL(joint);
+	// Godot asks to *disable*; Box3D is told whether they *collide*.
+	joint->set_collide_connected(!p_disable);
+}
+
+bool Box3DPhysicsServer3D::joint_is_disabled_collisions_between_bodies(RID p_joint) const {
+	const Box3DJoint3D *joint = joint_owner.get_or_null(p_joint);
+	ERR_FAIL_NULL_V(joint, false);
+	return !joint->is_collide_connected();
+}
+
+void Box3DPhysicsServer3D::joint_make_pin(RID p_joint, RID p_body_A, const Vector3 &p_local_A, RID p_body_B, const Vector3 &p_local_B) {
+	Box3DJoint3D *joint = joint_owner.get_or_null(p_joint);
+	ERR_FAIL_NULL(joint);
+	joint->make_pin(body_owner.get_or_null(p_body_A), p_local_A, body_owner.get_or_null(p_body_B), p_local_B);
+}
+
+void Box3DPhysicsServer3D::joint_make_hinge(RID p_joint, RID p_body_A, const Transform3D &p_hinge_A, RID p_body_B, const Transform3D &p_hinge_B) {
+	Box3DJoint3D *joint = joint_owner.get_or_null(p_joint);
+	ERR_FAIL_NULL(joint);
+	joint->make_hinge(body_owner.get_or_null(p_body_A), p_hinge_A, body_owner.get_or_null(p_body_B), p_hinge_B);
+}
+
+void Box3DPhysicsServer3D::joint_make_hinge_simple(RID p_joint, RID p_body_A, const Vector3 &p_pivot_A, const Vector3 &p_axis_A, RID p_body_B, const Vector3 &p_pivot_B, const Vector3 &p_axis_B) {
+	Box3DJoint3D *joint = joint_owner.get_or_null(p_joint);
+	ERR_FAIL_NULL(joint);
+	// Box3D's revolute joint spins about its frame's z axis, so a pivot-and-axis
+	// hinge becomes a frame whose z column is that axis.
+	joint->make_hinge(body_owner.get_or_null(p_body_A), _frame_from_axis(p_pivot_A, p_axis_A),
+			body_owner.get_or_null(p_body_B), _frame_from_axis(p_pivot_B, p_axis_B));
+}
+
+void Box3DPhysicsServer3D::joint_make_slider(RID p_joint, RID p_body_A, const Transform3D &p_local_frame_A, RID p_body_B, const Transform3D &p_local_frame_B) {
+	Box3DJoint3D *joint = joint_owner.get_or_null(p_joint);
+	ERR_FAIL_NULL(joint);
+	joint->make_slider(body_owner.get_or_null(p_body_A), p_local_frame_A, body_owner.get_or_null(p_body_B), p_local_frame_B);
+}
+
+void Box3DPhysicsServer3D::joint_make_cone_twist(RID p_joint, RID p_body_A, const Transform3D &p_local_frame_A, RID p_body_B, const Transform3D &p_local_frame_B) {
+	Box3DJoint3D *joint = joint_owner.get_or_null(p_joint);
+	ERR_FAIL_NULL(joint);
+	joint->make_cone_twist(body_owner.get_or_null(p_body_A), p_local_frame_A, body_owner.get_or_null(p_body_B), p_local_frame_B);
+}
+
+void Box3DPhysicsServer3D::joint_make_generic_6dof(RID p_joint, RID p_body_A, const Transform3D &p_local_frame_A, RID p_body_B, const Transform3D &p_local_frame_B) {
+	Box3DJoint3D *joint = joint_owner.get_or_null(p_joint);
+	ERR_FAIL_NULL(joint);
+	joint->make_generic_6dof(body_owner.get_or_null(p_body_A), p_local_frame_A, body_owner.get_or_null(p_body_B), p_local_frame_B);
+}
+
+void Box3DPhysicsServer3D::generic_6dof_joint_set_param(RID p_joint, Vector3::Axis p_axis, G6DOFJointAxisParam p_param, real_t p_value) {
+	Box3DJoint3D *joint = joint_owner.get_or_null(p_joint);
+	ERR_FAIL_NULL(joint);
+	joint->set_g6dof_param(p_axis, p_param, p_value);
+}
+
+real_t Box3DPhysicsServer3D::generic_6dof_joint_get_param(RID p_joint, Vector3::Axis p_axis, G6DOFJointAxisParam p_param) const {
+	const Box3DJoint3D *joint = joint_owner.get_or_null(p_joint);
+	ERR_FAIL_NULL_V(joint, 0);
+	return joint->get_g6dof_param(p_axis, p_param);
+}
+
+void Box3DPhysicsServer3D::generic_6dof_joint_set_flag(RID p_joint, Vector3::Axis p_axis, G6DOFJointAxisFlag p_flag, bool p_enable) {
+	Box3DJoint3D *joint = joint_owner.get_or_null(p_joint);
+	ERR_FAIL_NULL(joint);
+	joint->set_g6dof_flag(p_axis, p_flag, p_enable);
+}
+
+bool Box3DPhysicsServer3D::generic_6dof_joint_get_flag(RID p_joint, Vector3::Axis p_axis, G6DOFJointAxisFlag p_flag) const {
+	const Box3DJoint3D *joint = joint_owner.get_or_null(p_joint);
+	ERR_FAIL_NULL_V(joint, false);
+	return joint->get_g6dof_flag(p_axis, p_flag);
+}
+
+void Box3DPhysicsServer3D::hinge_joint_set_param(RID p_joint, HingeJointParam p_param, real_t p_value) {
+	Box3DJoint3D *joint = joint_owner.get_or_null(p_joint);
+	ERR_FAIL_NULL(joint);
+	joint->set_hinge_param(p_param, p_value);
+}
+
+real_t Box3DPhysicsServer3D::hinge_joint_get_param(RID p_joint, HingeJointParam p_param) const {
+	const Box3DJoint3D *joint = joint_owner.get_or_null(p_joint);
+	ERR_FAIL_NULL_V(joint, 0);
+	return joint->get_hinge_param(p_param);
+}
+
+void Box3DPhysicsServer3D::hinge_joint_set_flag(RID p_joint, HingeJointFlag p_flag, bool p_value) {
+	Box3DJoint3D *joint = joint_owner.get_or_null(p_joint);
+	ERR_FAIL_NULL(joint);
+	joint->set_hinge_flag(p_flag, p_value);
+}
+
+bool Box3DPhysicsServer3D::hinge_joint_get_flag(RID p_joint, HingeJointFlag p_flag) const {
+	const Box3DJoint3D *joint = joint_owner.get_or_null(p_joint);
+	ERR_FAIL_NULL_V(joint, false);
+	return joint->get_hinge_flag(p_flag);
+}
+
+void Box3DPhysicsServer3D::slider_joint_set_param(RID p_joint, SliderJointParam p_param, real_t p_value) {
+	Box3DJoint3D *joint = joint_owner.get_or_null(p_joint);
+	ERR_FAIL_NULL(joint);
+	joint->set_slider_param(p_param, p_value);
+}
+
+real_t Box3DPhysicsServer3D::slider_joint_get_param(RID p_joint, SliderJointParam p_param) const {
+	const Box3DJoint3D *joint = joint_owner.get_or_null(p_joint);
+	ERR_FAIL_NULL_V(joint, 0);
+	return joint->get_slider_param(p_param);
+}
+
+void Box3DPhysicsServer3D::cone_twist_joint_set_param(RID p_joint, ConeTwistJointParam p_param, real_t p_value) {
+	Box3DJoint3D *joint = joint_owner.get_or_null(p_joint);
+	ERR_FAIL_NULL(joint);
+	joint->set_cone_twist_param(p_param, p_value);
+}
+
+real_t Box3DPhysicsServer3D::cone_twist_joint_get_param(RID p_joint, ConeTwistJointParam p_param) const {
+	const Box3DJoint3D *joint = joint_owner.get_or_null(p_joint);
+	ERR_FAIL_NULL_V(joint, 0);
+	return joint->get_cone_twist_param(p_param);
 }

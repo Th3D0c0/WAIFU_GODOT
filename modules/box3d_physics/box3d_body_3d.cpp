@@ -32,6 +32,7 @@
 
 #include "box3d_conversions.h"
 #include "box3d_direct_body_state_3d.h"
+#include "box3d_joint_3d.h"
 #include "box3d_space_3d.h"
 
 #include "core/error/error_macros.h"
@@ -175,6 +176,13 @@ void Box3DBody3D::set_space(Box3DSpace3D *p_space) {
 	if (space != nullptr) {
 		space->add_body(this);
 		_build();
+	}
+
+	// The body's b3BodyId has just been created or destroyed, and a constraint holds
+	// those ids directly, so every joint on this body has to be rebuilt against the
+	// new world - or torn down, if the body just left one.
+	for (Box3DJoint3D *joint : joints) {
+		joint->bodies_changed();
 	}
 }
 

@@ -34,6 +34,7 @@
 
 #include "core/math/transform_3d.h"
 #include "core/object/object_id.h"
+#include "core/templates/hash_set.h"
 #include "core/templates/local_vector.h"
 #include "core/templates/rid.h"
 #include "servers/physics_3d/physics_server_3d.h"
@@ -42,6 +43,7 @@
 
 class Box3DSpace3D;
 class Box3DDirectBodyState3D;
+class Box3DJoint3D;
 
 // A Godot body and the Box3D body backing it.
 //
@@ -87,6 +89,10 @@ class Box3DBody3D {
 	Callable state_sync_callback;
 	LocalVector<ShapeSlot> shapes;
 	Box3DDirectBodyState3D *direct_state = nullptr;
+	// Joints referencing this body. A Box3D constraint can only exist while both its
+	// endpoints are resident in the same world, so every joint here has to be told
+	// when this body enters or leaves a space.
+	HashSet<Box3DJoint3D *> joints;
 
 	void _build();
 	void _destroy();
@@ -169,6 +175,10 @@ public:
 	// never have their direct state asked for, and Godot only reaches for it through
 	// body_get_direct_state() or the state sync callback.
 	Box3DDirectBodyState3D *get_direct_state();
+
+	void add_joint(Box3DJoint3D *p_joint) { joints.insert(p_joint); }
+	void remove_joint(Box3DJoint3D *p_joint) { joints.erase(p_joint); }
+	const HashSet<Box3DJoint3D *> &get_joints() const { return joints; }
 
 	~Box3DBody3D();
 };
