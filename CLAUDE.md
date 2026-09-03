@@ -214,15 +214,37 @@ exactly what the `jolt_physics` patch in the rebase checklist had to expose by h
 
 ### What actually runs today
 
-Shapes, bodies, spaces, stepping, transform sync, downward raycasts and all five
-joint types. A box and a
-sphere dropped from 5 m rest at y=0.499 against a 1 mm soft-solver penetration, and a
-capsule, a cylinder and a convex hull land correctly on a `ConcavePolygonShape3D`
-floor. A pin joint holds its anchor distance to 1.503 against Jolt's 1.503, a cone
-twist limits swing to 29.9 degrees against a 30 degree span, and a 6DOF linear spring
-absorbs a 6 N s impulse with a 0.104 m peak excursion and returns to its equilibrium
-pose exactly. Areas, contact reporting, `body_test_motion` and the remaining queries
-are still stubs — run a scene and `B3_TODO()` names them.
+**`Project_WAIFU`'s `main.tscn` runs end to end on Box3D and tracks Jolt closely.**
+Shapes, bodies, spaces, stepping, transform sync, all five joint types, areas,
+contact reporting, `body_test_motion` and the shape queries are implemented.
+
+The A/B that says so is `Tools/box3d/probe.gd` in `Project_WAIFU`, which loads the
+real scene under either backend and dumps the rig after three seconds. Every body
+settles within 3 mm of its position under Jolt — head at 2.050 against 2.053, pelvis
+1.016 against 1.019, hands within 3 mm on all axes — and rays onto the CSG climbing
+wall and ramp report y 5.556 and y 0.744 on both. Switch backends with `override.cfg`,
+which sets `physics/3d/physics_engine` without touching the tracked `project.godot`.
+
+Isolated behavior, measured earlier: a box and a sphere dropped from 5 m rest at
+y=0.499 against a 1 mm soft-solver penetration; a capsule, a cylinder and a convex
+hull land on a `ConcavePolygonShape3D` floor; a pin joint holds its anchor distance to
+1.503 against Jolt's 1.503; a cone twist limits swing to 29.9 degrees against a 30
+degree span; a 6DOF linear spring absorbs a 6 N s impulse with a 0.104 m peak
+excursion and returns to its equilibrium pose exactly.
+
+57 `B3_TODO()` stubs remain, and they are not all equal:
+
+- **40 are `soft_body_*`** and are permanent. Box3D has no soft bodies at all, and
+  `Project_WAIFU` uses none.
+- **`collide_shape` and `body_set_collision_priority` are reachable from this project**
+  — one call site in the game, one in the vendored `godot-xr-tools` `snap_path.gd` —
+  so they are the next real work.
+- The rest are unused here: `world_boundary`, `separation_ray`, `heightmap` and custom
+  shape creation, the `space_*_contacts` debug hooks, `body_*_user_flags`,
+  `body_set_force_integration_callback` and `shape_*_custom_solver_bias`.
+
+What has *not* been measured yet is the thing the experiment exists to answer:
+performance against Jolt. The rig matching is a correctness result, not a timing one.
 
 Four Box3D behaviors that are not guessable from the headers and cost a debug cycle
 each if rediscovered:
