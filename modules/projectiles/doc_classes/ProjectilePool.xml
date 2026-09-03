@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="ProjectilePool" inherits="Node3D" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		A pooled simulator that owns every projectile in the scene.
+	</brief_description>
+	<description>
+		One node simulates every projectile; none of them is a node. Projectiles live in a fixed-capacity pool and are addressed by opaque [int] handles rather than by object reference, so a handle held across frames can never address a projectile that has since ended.
+		Motion is integrated with Velocity Verlet. Collision is a ray along the swept segment, so a projectile cannot tunnel through anything however fast it is going - the ray covers the whole step. Steps are only subdivided when they need to be: once because a curved path's chord would otherwise cut the corner by more than the projectile is wide, and once per collision, so a projectile that pierces something a third of the way through a tick spends the rest of that tick instead of stopping inside it.
+		On collision, behaviors resolve in Path of Exile's order - Split, Pierce, Fork, Chain, Return, then Bounce - and exactly one fires per hit. A behavior that cannot be performed (a chain with nothing in range) falls through to the next rather than ending the projectile. See [ProjectileKind].
+		Hits are reported once per physics tick as packed arrays through [signal projectiles_hit], not once per hit: at a few hundred projectiles the per-call cost of crossing into GDScript exceeds the cost of the simulation itself.
+		[b]This node does not draw anything.[/b] Assign a [MultiMesh] to [member multimesh] to have it write instance transforms (parent the [MultiMeshInstance3D] to this node at identity - transforms are written in this node's local space), or read [method get_positions] and drive any other renderer.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="clear">
+			<return type="void" />
+			<description>
+				Ends every projectile in flight and invalidates every outstanding handle.
+			</description>
+		</method>
+		<method name="clear_homing_target">
+			<return type="void" />
+			<param index="0" name="handle" type="int" />
+			<description>
+				Stops the projectile homing. It keeps its current velocity.
+			</description>
+		</method>
+		<method name="despawn">
+			<return type="void" />
+			<param index="0" name="handle" type="int" />
+			<description>
+				Ends one projectile. Does nothing if the handle is stale, so callers holding handles across frames need no separate liveness check.
+			</description>
+		</method>
+		<method name="get_live_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				How many projectiles are currently in flight.
+			</description>
+		</method>
+		<method name="get_positions" qualifiers="const">
+			<return type="PackedVector3Array" />
+			<description>
+				Every live projectile's world position, packed. Ordering is not stable across ticks - a projectile ending swap-removes the last one into its place - so this is for feeding a renderer, not for tracking an individual projectile.
+			</description>
+		</method>
+		<method name="get_projectile_position" qualifiers="const">
+			<return type="Vector3" />
+			<param index="0" name="handle" type="int" />
+			<description>
+				World position of one projectile. Errors and returns [constant Vector3.ZERO] if the handle is stale.
+			</description>
+		</method>
+		<method name="get_projectile_velocity" qualifiers="const">
+			<return type="Vector3" />
+			<param index="0" name="handle" type="int" />
+			<description>
+				Velocity of one projectile, in meters per second.
+			</description>
+		</method>
+		<method name="is_alive" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="handle" type="int" />
+			<description>
+				Whether the handle still addresses a live projectile. Always [code]false[/code] for [code]0[/code].
+			</description>
+		</method>
+		<method name="set_homing_target">
+			<return type="void" />
+			<param index="0" name="handle" type="int" />
+			<param index="1" name="target" type="Vector3" />
+			<description>
+				Points the projectile at a world position. Has no effect unless its [ProjectileKind] sets [member ProjectileKind.homing_acceleration] above zero. The target is a position, not a node: a homing projectile that outlives its target keeps its last known aim rather than dereferencing a freed object.
+			</description>
+		</method>
+		<method name="set_projectile_velocity">
+			<return type="void" />
+			<param index="0" name="handle" type="int" />
+			<param index="1" name="velocity" type="Vector3" />
+			<description>
+				Overrides one projectile's velocity - a deflect, a gust, a time-stop release.
+			</description>
+		</method>
+		<method name="spawn">
+			<return type="int" />
+			<param index="0" name="kind" type="ProjectileKind" />
+			<param index="1" name="position" type="Vector3" />
+			<param index="2" name="velocity" type="Vector3" />
+			<description>
+				Adds one projectile and returns its handle, or [code]0[/code] if the pool is full. A full pool refuses rather than growing: reallocating mid-tick is a frame spike, and in VR a frame spike is the thing being avoided.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="capacity" type="int" setter="set_capacity" getter="get_capacity" default="256">
+			How many projectiles can be in flight at once. Changing this drops everything in flight, so set it once at set-up.
+		</member>
+		<member name="gravity" type="Vector3" setter="set_gravity" getter="get_gravity" default="Vector3(0, -9.8, 0)">
+			Gravity applied to every projectile, scaled per kind by [member ProjectileKind.gravity_scale]. Independent of the physics server's gravity so a projectile can arc in a world that does not.
+		</member>
+		<member name="max_substeps" type="int" setter="set_max_substeps" getter="get_max_substeps" default="8">
+			Ceiling on how many times one projectile may be integrated - and therefore ray-queried - in a single tick. A projectile flying through empty air uses exactly one however fast it moves; each collision it survives costs another. This caps the worst case, so a projectile piercing a dense crowd cannot cost an unbounded number of queries in one tick.
+		</member>
+		<member name="multimesh" type="MultiMesh" setter="set_multimesh" getter="get_multimesh">
+			Optional [MultiMesh] to write instance transforms into, one per live projectile, scaled to each projectile's radius. Recycled instances have their physics interpolation reset, without which a reused slot draws a one-frame streak from wherever its previous occupant died.
+		</member>
+	</members>
+	<signals>
+		<signal name="projectiles_ended">
+			<param index="0" name="handles" type="PackedInt64Array" />
+			<description>
+				Emitted once per physics tick listing every projectile that left the pool - expired, out of range, consumed by a hit, or despawned. Handles in this array are already stale; they are for tearing down whatever was drawn for them.
+			</description>
+		</signal>
+		<signal name="projectiles_hit">
+			<param index="0" name="handles" type="PackedInt64Array" />
+			<param index="1" name="positions" type="PackedVector3Array" />
+			<param index="2" name="normals" type="PackedVector3Array" />
+			<param index="3" name="collider_ids" type="PackedInt64Array" />
+			<description>
+				Emitted once per physics tick with every collision that occurred, one entry per array per hit. Resolve a collider with [method @GlobalScope.instance_from_id].
+				A handle appearing here has not necessarily ended - a pierce or a chain hits and carries on. Check [method is_alive], or watch [signal projectiles_ended].
+			</description>
+		</signal>
+	</signals>
+</class>

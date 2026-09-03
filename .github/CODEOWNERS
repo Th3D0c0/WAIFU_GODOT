@@ -297,6 +297,8 @@ SCsub                                         @godotengine/buildsystem
 #
 # Kept at EOF on purpose: appending here conflicts far less on upstream rebases
 # than inserting into the Modules section. Must stay after the buildsystem
-# catch-alls above so it also claims this module's SCsub and config.py.
+# catch-alls above so it also claims these modules' SCsub and config.py.
 
 /modules/waifu_test/                          @Th3D0c0
+/modules/projectiles/                         @Th3D0c0
+/modules/limboai                              @Th3D0c0

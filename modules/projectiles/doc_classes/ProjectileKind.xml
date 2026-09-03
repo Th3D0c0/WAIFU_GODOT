@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="ProjectileKind" inherits="Resource" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../../doc/class.xsd">
+	<brief_description>
+		The tunables shared by every projectile of one type.
+	</brief_description>
+	<description>
+		One of these describes a type of projectile - an arrow, a bullet, a fireball. [ProjectilePool] holds one per type, and every projectile of that type stores an index into it rather than a copy, so retuning a type is a change to one resource and costs nothing per projectile in flight.
+		[b]Behaviors resolve in a fixed order on every collision:[/b] Split, Pierce, Fork, Chain, Return, Bounce. Exactly one fires per hit - the first the projectile still has a charge for. A behavior that cannot be performed falls through to the next rather than ending the projectile, so a projectile that can chain and return will chain while there are targets and come home when there are none.
+		The order matters and is deliberate. A projectile that can both pierce and chain spends its pierces walking through the front rank before it starts hopping between targets; the reverse reads as the projectile losing interest in what it just hit.
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="behaviors" type="int" setter="set_behaviours" getter="get_behaviours" enum="ProjectileKind.Behavior" is_bitfield="true" default="0">
+			Which behaviors this projectile type may perform. Each still needs a count above zero to fire.
+		</member>
+		<member name="bounce_count" type="int" setter="set_bounce_count" getter="get_bounce_count" default="0">
+			How many times the projectile may bounce off geometry.
+		</member>
+		<member name="bounce_friction" type="float" setter="set_bounce_friction" getter="get_bounce_friction" default="0.2">
+			How much of the velocity [i]along[/i] the surface a bounce keeps. Splitting friction from restitution is what makes a shallow graze skid along a wall while a square hit comes back.
+		</member>
+		<member name="bounce_restitution" type="float" setter="set_bounce_restitution" getter="get_bounce_restitution" default="0.5">
+			How much of the velocity [i]into[/i] the surface a bounce returns.
+		</member>
+		<member name="chain_count" type="int" setter="set_chain_count" getter="get_chain_count" default="0">
+			How many times the projectile may redirect to another target within [member seek_radius]. It will not chain to anything it has hit recently.
+		</member>
+		<member name="collide_with_areas" type="bool" setter="set_collide_with_areas" getter="get_collide_with_areas" default="false">
+			Whether [Area3D]s count as collisions and as chain targets.
+		</member>
+		<member name="collision_mask" type="int" setter="set_collision_mask" getter="get_collision_mask" default="4294967295">
+			Physics layers the projectile collides with.
+		</member>
+		<member name="drag" type="float" setter="set_drag" getter="get_drag" default="0.0">
+			Quadratic drag coefficient. Quadratic, as air resistance is: the square is what lets a heavy projectile read as heavy without making a dart feel like it is in syrup.
+		</member>
+		<member name="fork_angle" type="float" setter="set_fork_angle" getter="get_fork_angle" default="1.0471976">
+			Half-angle a fork spreads to, in radians. Defaults to 60°, as Path of Exile forks. Forking is about world up, falling back to the surface for a projectile travelling straight up or down.
+		</member>
+		<member name="fork_count" type="int" setter="set_fork_count" getter="get_fork_count" default="1">
+			How many times the projectile may fork. A fork replaces the projectile with two travelling at [member fork_angle] either side of it.
+		</member>
+		<member name="gravity_scale" type="float" setter="set_gravity_scale" getter="get_gravity_scale" default="0.0">
+			Multiplier on [member ProjectilePool.gravity]. Zero - the default - is a projectile that flies straight.
+		</member>
+		<member name="homing_acceleration" type="float" setter="set_homing_acceleration" getter="get_homing_acceleration" default="0.0">
+			Acceleration towards the target set by [method ProjectilePool.set_homing_target], in m/s². An acceleration rather than a steering rate, so a homing projectile overshoots and curves back instead of snapping onto its target.
+		</member>
+		<member name="lifetime" type="float" setter="set_lifetime" getter="get_lifetime" default="5.0">
+			Seconds before the projectile ends on its own.
+		</member>
+		<member name="max_distance" type="float" setter="set_max_distance" getter="get_max_distance" default="15.0">
+			Meters travelled before the projectile ends. Defaults to 15, Path of Exile's projectile range. Reset by a return, and children of a split or fork start again from zero - carrying the parent's distance would kill a fork made at the far edge of its range the instant it appeared.
+		</member>
+		<member name="pierce_count" type="int" setter="set_pierce_count" getter="get_pierce_count" default="0">
+			How many objects the projectile may pass through, keeping its direction and speed. Each object is pierced once however thick it is.
+		</member>
+		<member name="radius" type="float" setter="set_radius" getter="get_radius" default="0.15">
+			The projectile's radius. Used to scale its [MultiMesh] instance, and as the accuracy bound on curved flight: a step is subdivided when the arc would bow away from the ray that tests it by more than this, so the collision ray is never wrong by more than the projectile is wide.
+		</member>
+		<member name="return_count" type="int" setter="set_return_count" getter="get_return_count" default="1">
+			How many times the projectile may turn back towards where it was cast. Returning clears its memory of what it has hit, so it gets one more go at everything on the way home.
+		</member>
+		<member name="seek_mask" type="int" setter="set_seek_mask" getter="get_seek_mask" default="4294967295">
+			Physics layers searched for chain and split targets. Usually narrower than [member collision_mask] - a projectile collides with walls but should not chain to them.
+		</member>
+		<member name="seek_radius" type="float" setter="set_seek_radius" getter="get_seek_radius" default="6.0">
+			How far a chain or split looks for its next target. Defaults to 6 m, as Path of Exile chains.
+		</member>
+		<member name="split_count" type="int" setter="set_split_count" getter="get_split_count" default="3">
+			How many projectiles a split makes. They aim at the nearest targets in [member seek_radius], fanning evenly when there are not enough to go round. Splitting happens once per projectile, however far down the tree.
+		</member>
+	</members>
+	<constants>
+		<constant name="BEHAVIOUR_NONE" value="0" enum="Behavior" is_bitfield="true">
+			No behaviors. The projectile ends on its first collision.
+		</constant>
+		<constant name="BEHAVIOUR_SPLIT" value="1" enum="Behavior" is_bitfield="true">
+			Convert into [member split_count] auto-targeting projectiles. Highest priority, and happens once.
+		</constant>
+		<constant name="BEHAVIOUR_PIERCE" value="2" enum="Behavior" is_bitfield="true">
+			Pass through the target, keeping direction and speed.
+		</constant>
+		<constant name="BEHAVIOUR_FORK" value="4" enum="Behavior" is_bitfield="true">
+			Replace the projectile with two, at [member fork_angle] either side.
+		</constant>
+		<constant name="BEHAVIOUR_CHAIN" value="8" enum="Behavior" is_bitfield="true">
+			Redirect to another target within [member seek_radius], never one hit recently.
+		</constant>
+		<constant name="BEHAVIOUR_RETURN" value="16" enum="Behavior" is_bitfield="true">
+			Turn back towards where the projectile was cast.
+		</constant>
+		<constant name="BEHAVIOUR_BOUNCE" value="32" enum="Behavior" is_bitfield="true">
+			Reflect off the surface. Not one of Path of Exile's; it sits below the whole target-seeking ladder because it is the only behavior here that reflects off geometry rather than off a target, so a projectile with chains left chains off an enemy and bounces only once there is nothing left to chain to.
+		</constant>
+	</constants>
+</class>

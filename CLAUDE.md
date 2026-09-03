@@ -29,6 +29,39 @@ scons platform=windows target=template_release -j32
 **Builds are long — always run them with `run_in_background` and keep working**, then read the
 result. Never block on a compile.
 
+### Build from PowerShell, never from Git Bash
+
+Despite the `sh` above, run SCons from **PowerShell**. Git Bash sets `MSYSTEM=MINGW64`, and
+`platform/windows/detect.py:207-220` reads that as "we are cross-compiling from MSYS2":
+
+```python
+deps_folder = os.getenv("LOCALAPPDATA")
+if deps_folder and not os.getenv("MSYSTEM"):
+    deps_folder = os.path.join(deps_folder, "Godot", "build_deps")
+else:
+    # Cross-compiling, the deps install script puts things in `bin`.
+    ...
+    deps_folder = os.path.join(caller_script_dir, "bin", "build_deps")
+```
+
+So the whole `%LOCALAPPDATA%\Godot\build_deps` tree — `accesskit`, `agility_sdk`, `mesa-*`,
+`pix` — becomes invisible and it looks in `bin/build_deps`, which does not exist. SCons then
+prints two ERROR lines about missing AccessKit and D3D12 dependencies, suggesting you run
+`install_accesskit.py` / `install_d3d12_sdk_windows.py` — **do not**, they are already
+installed and in the right place. It is looking in the wrong directory, not missing anything.
+
+**The trap is that this exits 0.** It bails out during SConscript reading, before compiling
+anything, so `$?` is 0, no object files are produced, and `bin/godot.windows.editor.x86_64.exe`
+keeps its old timestamp. A background build "succeeds" in seconds and you test a stale binary.
+
+Two habits that catch it regardless of shell:
+
+- Check the binary's mtime against the clock after any build you intend to test.
+- Grep the log for `ERROR:` rather than trusting the exit code.
+
+Passing `accesskit_sdk_path=` and `agility_sdk_path=` explicitly also works, but only fixes the
+two deps you happen to name — the mesa and pix paths are wrong in the same way.
+
 ## Pre-commit hooks (prek) — run these before pushing
 
 CI runs Godot's full `prek` hook suite on every push. Formatting failures there are avoidable;
@@ -76,6 +109,40 @@ modules/<name>/
   tests/test_<name>.h      # doctest TEST_CASE("[Modules][<Name>] ...")
 ```
 
+Fork modules so far: `waifu_test` (the reference), `projectiles` (`ProjectilePool`,
+`ProjectileKind`), and `limboai` — behavior trees and hierarchical state machines.
+
+`limboai` is **vendored third-party code**, not ours: a **git submodule** tracking
+[limbonaut/limboai](https://github.com/limbonaut/limboai), pinned at tag `v1.8.1`
+(commit `e45e60e`), MIT licensed. Clone the fork with `--recursive`, or run
+`git submodule update --init` in an existing checkout, or the module directory is empty
+and the build silently drops behavior trees. Re-pin it with a checkout inside the
+submodule followed by a commit of the new gitlink in the parent:
+
+```sh
+git -C modules/limboai fetch --tags
+git -C modules/limboai checkout v1.9.0
+git add modules/limboai && git commit -m "Bump limboai to v1.9.0"
+```
+
+Pick its version from the compatibility table in its README, not from what is newest:
+the `1.8.x` line is the one built against Godot 4.7, and its `deps.env` says
+`GODOT_REF=4.7-stable`. Do not edit anything under it — a local change is a merge
+conflict on every upgrade, exactly like a core patch. Its CODEOWNERS line exists only
+to satisfy the CI hook; it does not mean we maintain it — and note that line is written
+**without** a trailing slash (`/modules/limboai`), because a submodule is a single gitlink
+entry in the tree rather than a directory, so the usual `/modules/<name>/` directory pattern
+matches nothing and `validate_codeowners.py` reports `<UNOWNED>`.
+
+Its `demo/` subtree tends to show as locally modified — those are Godot editor `.import`
+artifacts from opening the demo project, not edits to module source. Harmless; leave them.
+
+- **The directory name is an identifier, not a label.** `modules/modules_builders.py` writes
+  `initialize_<dirname>_module` into `register_module_types.gen.cpp` and
+  `MODULE_<DIRNAME_UPPER>_ENABLED` into `modules_enabled.gen.h`, both verbatim — capitals and
+  underscores included. So renaming a module's folder means renaming those two functions in
+  its `register_types.{h,cpp}` to match, or the build fails to link. Every upstream module is
+  lowercase; stay lowercase and the question never comes up.
 - Keep the Godot copyright header block on every new engine source file — the fork inherits
   upstream's licensing and file conventions.
 - Guard registration on the correct `ModuleInitializationLevel`; registering at the wrong
@@ -103,9 +170,13 @@ Keep this list accurate — it is the rebase checklist.
 
 | File | Change | Why |
 |---|---|---|
-| `.github/CODEOWNERS` | 6-line fork-local block appended at EOF, `/modules/waifu_test/ @Th3D0c0` | Required by the `validate-codeowners` CI hook; every file under `modules/` must have an owner. Placed at EOF (last-match-wins) so it also claims the module's `SCsub`/`config.py`, and because appending conflicts less than inserting into the Modules section. |
+| `.github/CODEOWNERS` | Fork-local block appended at EOF, one line per fork module (`/modules/waifu_test/`, `/modules/projectiles/`, both `@Th3D0c0`) | Required by the `validate-codeowners` CI hook; every file under `modules/` must have an owner. Placed at EOF (last-match-wins) so it also claims each module's `SCsub`/`config.py`, and because appending conflicts less than inserting into the Modules section. Add a line here with every new module. |
 
-No diffs under `core/`, `scene/`, `servers/`, or `drivers/`. Keep it that way.
+| `modules/jolt_physics/jolt_physics_server_3d.{h,cpp}` | `_bind_methods()` given a body: binds the four `generic_6dof_joint_*_jolt_{param,flag}` methods and their enum constants, and `init()`/`finish()` register/unregister an `Engine` singleton named `JoltPhysicsServer3D` | Jolt's 6DOF extensions exist in C++ but are unreachable from GDScript: upstream leaves `_bind_methods` empty, and the `PhysicsServer3D` scripting singleton is registered before the configured backend is constructed, so it captures the placeholder. The VR hand drives need `G6DOF_JOINT_ANGULAR_SPRING_FREQUENCY` (inertia-independent damping ratio) and `G6DOF_JOINT_ANGULAR_SPRING_MAX_TORQUE` (a real torque ceiling instead of clamping the commanded angle). Rationale is in the comments at the top of the `.cpp`. |
+
+No diffs under `core/`, `scene/`, `servers/`, or `drivers/`. Keep it that way. The
+`jolt_physics` row above is a module, not core, but it is still an upstream file and will
+conflict on rebases — treat it with the same suspicion.
 
 ## Rebasing on upstream
 

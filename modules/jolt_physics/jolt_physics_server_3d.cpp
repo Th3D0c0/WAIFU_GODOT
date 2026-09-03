@@ -53,6 +53,44 @@
 #include "spaces/jolt_space_3d.h"
 #include "spaces/jolt_temp_allocator.h"
 
+#include "core/config/engine.h"
+#include "core/object/class_db.h"
+
+// Exposes the Jolt-only Generic6DOF extensions to scripting.
+//
+// Upstream leaves _bind_methods empty, so these live in C++ only: the parameter
+// enums already carry VARIANT_ENUM_CAST and the methods already exist, but with
+// nothing bound there is no route to them from GDScript. Two of them matter here.
+//
+// G6DOF_JOINT_ANGULAR_SPRING_FREQUENCY switches the angular drive from
+// StiffnessAndDamping - literally F = -k*x - c*v, whose damping ratio collapses
+// as the load's inertia grows - to FrequencyAndDamping, where Jolt derives k and
+// c from the effective mass it measures at solve time (SpringPart.h:86-105). The
+// damping ratio then stops depending on what the hand is holding.
+//
+// G6DOF_JOINT_ANGULAR_SPRING_MAX_TORQUE is the drive's real torque ceiling, the
+// equivalent of a Unity ConfigurableJoint drive's maximumForce. Without it the
+// ceiling has to be emulated by clamping the commanded angle, which leashes the
+// drive to MAX_TORQUE/stiffness radians and makes a stiff drive saturate on any
+// fast movement.
+void JoltPhysicsServer3D::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("generic_6dof_joint_set_jolt_param", "joint", "axis", "param", "value"), &JoltPhysicsServer3D::generic_6dof_joint_set_jolt_param);
+	ClassDB::bind_method(D_METHOD("generic_6dof_joint_get_jolt_param", "joint", "axis", "param"), &JoltPhysicsServer3D::generic_6dof_joint_get_jolt_param);
+	ClassDB::bind_method(D_METHOD("generic_6dof_joint_set_jolt_flag", "joint", "axis", "flag", "enabled"), &JoltPhysicsServer3D::generic_6dof_joint_set_jolt_flag);
+	ClassDB::bind_method(D_METHOD("generic_6dof_joint_get_jolt_flag", "joint", "axis", "flag"), &JoltPhysicsServer3D::generic_6dof_joint_get_jolt_flag);
+
+	BIND_ENUM_CONSTANT(G6DOF_JOINT_LINEAR_SPRING_FREQUENCY);
+	BIND_ENUM_CONSTANT(G6DOF_JOINT_LINEAR_LIMIT_SPRING_FREQUENCY);
+	BIND_ENUM_CONSTANT(G6DOF_JOINT_LINEAR_LIMIT_SPRING_DAMPING);
+	BIND_ENUM_CONSTANT(G6DOF_JOINT_ANGULAR_SPRING_FREQUENCY);
+	BIND_ENUM_CONSTANT(G6DOF_JOINT_LINEAR_SPRING_MAX_FORCE);
+	BIND_ENUM_CONSTANT(G6DOF_JOINT_ANGULAR_SPRING_MAX_TORQUE);
+
+	BIND_ENUM_CONSTANT(G6DOF_JOINT_FLAG_ENABLE_LINEAR_LIMIT_SPRING);
+	BIND_ENUM_CONSTANT(G6DOF_JOINT_FLAG_ENABLE_LINEAR_SPRING_FREQUENCY);
+	BIND_ENUM_CONSTANT(G6DOF_JOINT_FLAG_ENABLE_ANGULAR_SPRING_FREQUENCY);
+}
+
 JoltPhysicsServer3D::JoltPhysicsServer3D(bool p_on_separate_thread) :
 		on_separate_thread(p_on_separate_thread) {
 	singleton = this;
@@ -1606,9 +1644,26 @@ void JoltPhysicsServer3D::set_active(bool p_active) {
 void JoltPhysicsServer3D::init() {
 	job_system = new JoltJobSystem();
 	temp_allocator = new JoltTempAllocator();
+
+	// Publish the live server under its own name.
+	//
+	// The scripting singleton called "PhysicsServer3D" is registered in
+	// register_server_types.cpp:412, which runs before the configured server has
+	// been chosen and constructed - so it captures the placeholder, not this
+	// object. Scripts reaching it therefore see a plain PhysicsServer3D and cannot
+	// call anything _bind_methods adds here, however correctly it is bound.
+	//
+	// A separate name rather than replacing that one: overwriting a singleton other
+	// code has already taken a pointer to is a worse problem than adding one, and
+	// asking for "JoltPhysicsServer3D" by name is self-documenting at the call site
+	// about depending on the backend.
+	Engine::get_singleton()->add_singleton(
+			Engine::Singleton("JoltPhysicsServer3D", this, "JoltPhysicsServer3D"));
 }
 
 void JoltPhysicsServer3D::finish() {
+	Engine::get_singleton()->remove_singleton("JoltPhysicsServer3D");
+
 	if (temp_allocator != nullptr) {
 		delete temp_allocator;
 		temp_allocator = nullptr;
