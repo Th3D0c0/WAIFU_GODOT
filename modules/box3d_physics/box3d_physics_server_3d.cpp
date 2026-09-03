@@ -727,6 +727,18 @@ bool Box3DPhysicsServer3D::generic_6dof_joint_get_flag(RID p_joint, Vector3::Axi
 	return joint->get_g6dof_flag(p_axis, p_flag);
 }
 
+void Box3DPhysicsServer3D::body_set_collision_priority(RID p_body, real_t p_priority) {
+	Box3DBody3D *body = body_owner.get_or_null(p_body);
+	ERR_FAIL_NULL(body);
+	body->set_collision_priority(p_priority);
+}
+
+real_t Box3DPhysicsServer3D::body_get_collision_priority(RID p_body) const {
+	const Box3DBody3D *body = body_owner.get_or_null(p_body);
+	ERR_FAIL_NULL_V(body, 0);
+	return body->get_collision_priority();
+}
+
 void Box3DPhysicsServer3D::pin_joint_set_param(RID p_joint, PinJointParam p_param, real_t p_value) {
 	Box3DJoint3D *joint = joint_owner.get_or_null(p_joint);
 	ERR_FAIL_NULL(joint);

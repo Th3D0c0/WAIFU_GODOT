@@ -80,15 +80,6 @@ int Box3DPhysicsServer3D::space_get_contact_count(RID) const {
 	return 0;
 }
 
-void Box3DPhysicsServer3D::body_set_collision_priority(RID, real_t) {
-	B3_TODO();
-}
-
-real_t Box3DPhysicsServer3D::body_get_collision_priority(RID) const {
-	B3_TODO();
-	return 0;
-}
-
 void Box3DPhysicsServer3D::body_set_user_flags(RID, uint32_t) {
 	B3_TODO();
 }

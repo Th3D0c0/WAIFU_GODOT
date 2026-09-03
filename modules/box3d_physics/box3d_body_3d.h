@@ -95,6 +95,10 @@ private:
 	real_t gravity_scale = 1.0;
 	real_t friction = 1.0;
 	real_t bounce = 0.0;
+	// Godot consults this only in its own solver's depenetration weighting, which has
+	// no Box3D counterpart, so it is stored and reported and nothing else - exactly
+	// what the Jolt backend does with it.
+	real_t collision_priority = 1.0;
 	bool ccd_enabled = false;
 	bool sleep_allowed = true;
 	bool ray_pickable = true;
@@ -159,6 +163,9 @@ public:
 	// Getters are inherited from Box3DCollisionObject3D; the setters rebuild.
 	void set_collision_layer(uint32_t p_layer);
 	void set_collision_mask(uint32_t p_mask);
+
+	void set_collision_priority(real_t p_priority) { collision_priority = p_priority; }
+	real_t get_collision_priority() const { return collision_priority; }
 
 	void set_ccd_enabled(bool p_enabled);
 	bool is_ccd_enabled() const { return ccd_enabled; }
