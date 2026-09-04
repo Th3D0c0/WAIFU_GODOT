@@ -79,6 +79,17 @@ prek run --all-files    # one-time full pass
 prek run --files <paths>   # reproduce a CI failure for specific files
 ```
 
+`make-rst` is `pass_filenames: false` and walks `doc/classes`, `modules` and `platform`
+itself, so it always validates the *whole* class reference and resolves type references
+across it — which means a change to one XML can be reported as an error in another. It
+runs at all only when one of the files you pass matches its `files:` pattern
+(`^(doc/classes|.*/doc_classes)/.*\.xml$`), so a doc change is worth an `--all-files` pass.
+
+Local prek is only as complete as your checkout: `make-rst` reads `modules/limboai`'s
+`doc_classes` off disk, so a missing submodule turns into `Unresolved type` errors that
+reproduce nowhere else. The static checks job used not to clone submodules at all, which
+is exactly how that bit us — see the `static_checks.yml` row below.
+
 prek downloads its own pinned **clang-format v21.1.7** (`.pre-commit-config.yaml`). Do not
 install clang-format separately — a different version formats differently than CI and will
 fight the hooks.
@@ -186,6 +197,7 @@ Keep this list accurate — it is the rebase checklist.
 | `modules/SCsub` | A `vendored_modules` list (currently `["limboai"]`); those modules' `tests/*.h` are not collected into `modules_tests.gen.h` | limboai's `tests/test_for_each.h` and `tests/test_set_var.h` each `memnew` a `Node` they never free, and doctest re-enters a `TEST_CASE` body once per leaf `SUBCASE` — 4 and 18 instances, the 22 `ObjectDB` leaks the suite reports. LeakSanitizer comes along with `use_asan=yes` on Linux and fails `--test` on them. The tests are limboai's and we cannot patch them from here. Runtime code is unaffected; only the vendored test suite is skipped. |
 | `.github/workflows/linux_builds.yml` | `module_limboai_enabled=no` added to the "Editor with doubles and GCC sanitizers" job only | That job is the largest link in the matrix — ASan + UBSan + doubles at `-O0` — and upstream already sat just under the 2 GB reach of `R_X86_64_PC32`. limboai pushed it ~25 MiB past, and mold failed with 120 `relocation out of range` errors against `libstdc++.a`'s `.gcc_except_table`. Purely a size ceiling, not a code defect: the module still builds under GCC on the Mono editor job, under clang on the other two sanitizer jobs, and on every template and non-Linux job. If a future addition overflows it again, the next lever is `optimize=debug` on that job. |
 | `doc/classes/@GlobalScope.xml` | One `<member name="LimboUtility">` entry | limboai registers a `LimboUtility` engine singleton, so `--doctool` genuinely emits it and the `Check for class reference updates` step fails until it is committed. Correct rather than a workaround — the fork's engine really does expose that singleton. Regenerate with `bin/godot... --doctool --headless` if the set of fork singletons changes. |
+| `.github/workflows/static_checks.yml` | `submodules: recursive` on the checkout | The only workflow that did not clone submodules, which was fine until `@GlobalScope.xml` gained a `LimboUtility` member — `make-rst` resolves types across the whole reference and `LimboUtility.xml` lives in `modules/limboai/doc_classes`, so it reported `Unresolved type` twice plus an unrecognized `[LimboUtility]` tag. Both the type attribute and the description need the submodule, so this cannot be dodged by rewording the doc. File-based hooks are unaffected: submodule content is not in this repository's index. |
 
 No diffs under `core/`, `scene/`, `servers/`, or `drivers/`. Keep it that way. The
 `jolt_physics` row above is a module, not core, but it is still an upstream file and will

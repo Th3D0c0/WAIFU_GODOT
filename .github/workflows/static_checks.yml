@@ -24,6 +24,14 @@ jobs:
         with:
           fetch-depth: 0 # Treeless clone. Slightly less performant than a shallow clone, but makes finding diffs instantaneous.
           filter: tree:0 # See: https://github.blog/open-source/git/get-up-to-speed-with-partial-clone-and-shallow-clone/
+          # Fork-local: every build workflow already does this; static checks did not need to
+          # until modules/limboai arrived. make-rst resolves types across the whole class
+          # reference, and @GlobalScope.xml carries a LimboUtility member whose type is only
+          # defined in that submodule's doc_classes. Without the submodule the hook reports
+          # Unresolved type "LimboUtility". File-based hooks are unaffected - submodule
+          # content is not in this repository's index, so clang-format and friends still
+          # skip it - but the directory-globbing doc hooks now see a complete reference.
+          submodules: recursive
 
       # This needs to happen before Python and npm execution; it must happen before any extra files are written.
       - name: .gitignore checks (gitignore_check.sh)
