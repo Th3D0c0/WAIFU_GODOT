@@ -78,36 +78,6 @@ jobs:
           fi
         continue-on-error: true
 
-      # TEMPORARY - Box3D/limboai CI investigation. Template builds fail with
-      # "'editor/gui/window_wrapper.h' file not found" while the file is tracked in the
-      # commit and the same build succeeds locally from a pristine checkout. Editor jobs
-      # cannot disprove it because they retrieve that object from the SCons cache and
-      # never compile it. This prints whether the file is actually on the runner.
-      # Remove once the cause is known.
-      - name: DIAGNOSTIC - is the editor header on disk?
-        run: |
-          echo "--- pwd / commit ---"
-          pwd; git log --oneline -1; git status --porcelain | head -5
-          echo "--- editor/gui listing ---"
-          ls -la editor/gui/ 2>&1 | head -20 || echo "editor/gui MISSING"
-          echo "--- the specific header ---"
-          ls -la editor/gui/window_wrapper.h 2>&1 || echo "window_wrapper.h ABSENT"
-          echo "--- git says it should be there ---"
-          git ls-files --error-unmatch editor/gui/window_wrapper.h 2>&1 || echo "NOT TRACKED per git"
-          echo "--- any copy anywhere ---"
-          find . -name window_wrapper.h -not -path './.git/*' 2>/dev/null | head
-          echo "--- editor dir summary ---"
-          echo "editor/ entries: $(ls editor 2>/dev/null | wc -l)"
-          echo "--- can clang itself resolve it with -I. from this cwd? ---"
-          echo '#include "editor/gui/window_wrapper.h"' > /tmp/inc_probe.cpp
-          echo 'int main() { return 0; }' >> /tmp/inc_probe.cpp
-          # Only the first diagnostic matters: "file not found" means resolution failed,
-          # anything else means clang opened it and choked on its contents, which is
-          # expected without the rest of Godot's headers and defines.
-          clang++ -I. -fsyntax-only /tmp/inc_probe.cpp 2>&1 | head -3
-          echo "--- and with the exact quoted-include semantics from that directory ---"
-          cd modules/limboai/compat && clang++ -I../../.. -fsyntax-only /tmp/inc_probe.cpp 2>&1 | head -3; cd - >/dev/null
-
       - name: Compilation (x86_64)
         uses: ./.github/actions/godot-build
         with:
