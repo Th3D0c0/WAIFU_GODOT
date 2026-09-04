@@ -1,3 +1,10 @@
 [submodule "modules/limboai"]
 	path = modules/limboai
 	url = https://github.com/limbonaut/limboai.git
+	# Never report working-tree changes inside the submodule, only a re-pin of the
+	# commit itself. Two things dirty it that are not ours to commit: opening demo/
+	# in the editor rewrites its .import artifacts, and `--doctool` adds Godot 4.7's
+	# api_type attribute to all 91 doc_classes XMLs, which limboai v1.8.1 predates.
+	# The latter otherwise fails the "Check for class reference updates" CI step,
+	# whose `git diff --exit-code` sees the gitlink go dirty.
+	ignore = dirty

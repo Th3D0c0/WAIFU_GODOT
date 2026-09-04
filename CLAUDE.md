@@ -139,8 +139,12 @@ to satisfy the CI hook; it does not mean we maintain it — and note that line i
 entry in the tree rather than a directory, so the usual `/modules/<name>/` directory pattern
 matches nothing and `validate_codeowners.py` reports `<UNOWNED>`.
 
-Its `demo/` subtree tends to show as locally modified — those are Godot editor `.import`
-artifacts from opening the demo project, not edits to module source. Harmless; leave them.
+`.gitmodules` sets `ignore = dirty` on it, so git reports a re-pin of the commit but never
+working-tree changes inside it. Two things dirty it routinely and neither is ours to commit:
+opening `demo/` in the editor rewrites its `.import` artifacts, and `--doctool` adds Godot
+4.7's `api_type` attribute to all 91 of its `doc_classes` XMLs, which v1.8.1 predates. The
+second one fails the `Check for class reference updates` CI step without that setting, since
+its `git diff --exit-code` sees the gitlink go dirty.
 
 - **The directory name is an identifier, not a label.** `modules/modules_builders.py` writes
   `initialize_<dirname>_module` into `register_module_types.gen.cpp` and
@@ -181,6 +185,7 @@ Keep this list accurate — it is the rebase checklist.
 | `modules/mono/build_scripts/build_assemblies.py` | `NoWarn` extended from `1591` to `1591%3B0108` | CI builds the generated C# glue with `--werror`, and the glue is generated from ClassDB, so a third-party module that collides with a base member becomes a CS0108 error. `modules/limboai` does it twice (`BTTask.Status` over `BT.Status`, `BBParam.GetType()` over `object.GetType()`); the generator cannot emit `new` and the submodule is not ours to patch. `%3B` is a literal `;` — MSBuild splits an unescaped one in a `/p:` value into a second property. |
 | `modules/SCsub` | A `vendored_modules` list (currently `["limboai"]`); those modules' `tests/*.h` are not collected into `modules_tests.gen.h` | limboai's `tests/test_for_each.h` and `tests/test_set_var.h` each `memnew` a `Node` they never free, and doctest re-enters a `TEST_CASE` body once per leaf `SUBCASE` — 4 and 18 instances, the 22 `ObjectDB` leaks the suite reports. LeakSanitizer comes along with `use_asan=yes` on Linux and fails `--test` on them. The tests are limboai's and we cannot patch them from here. Runtime code is unaffected; only the vendored test suite is skipped. |
 | `.github/workflows/linux_builds.yml` | `module_limboai_enabled=no` added to the "Editor with doubles and GCC sanitizers" job only | That job is the largest link in the matrix — ASan + UBSan + doubles at `-O0` — and upstream already sat just under the 2 GB reach of `R_X86_64_PC32`. limboai pushed it ~25 MiB past, and mold failed with 120 `relocation out of range` errors against `libstdc++.a`'s `.gcc_except_table`. Purely a size ceiling, not a code defect: the module still builds under GCC on the Mono editor job, under clang on the other two sanitizer jobs, and on every template and non-Linux job. If a future addition overflows it again, the next lever is `optimize=debug` on that job. |
+| `doc/classes/@GlobalScope.xml` | One `<member name="LimboUtility">` entry | limboai registers a `LimboUtility` engine singleton, so `--doctool` genuinely emits it and the `Check for class reference updates` step fails until it is committed. Correct rather than a workaround — the fork's engine really does expose that singleton. Regenerate with `bin/godot... --doctool --headless` if the set of fork singletons changes. |
 
 No diffs under `core/`, `scene/`, `servers/`, or `drivers/`. Keep it that way. The
 `jolt_physics` row above is a module, not core, but it is still an upstream file and will
