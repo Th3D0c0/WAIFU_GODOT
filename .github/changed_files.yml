@@ -20,6 +20,11 @@ sources:
 clangd:
   - "**/*.{h,hpp,hxx,hh,c,cpp,cxx,cc}"
   - "!**/thirdparty/**"
+  # Fork-local: modules/limboai is a vendored submodule, thirdparty in everything but
+  # location. Since the static checks job clones submodules (make-rst needs its
+  # doc_classes), changed-files recurses into it and every bump of the pin hands
+  # clangd-tidy code we do not maintain and will not patch.
+  - "!modules/limboai/**"
   - "!**/*-so_wrap.{h,c}"
   - "!drivers/{apple*,core*,d3d12,metal,wasapi,windows,winmidi,xaudio2}/**"
   - "!editor/shader/shader_baker/shader_baker_export_plugin_platform_{d3d12,metal}.{h,cpp}"
