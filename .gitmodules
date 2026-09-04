@@ -1,6 +1,11 @@
 [submodule "modules/limboai"]
 	path = modules/limboai
-	url = https://github.com/limbonaut/limboai.git
+	url = https://github.com/Th3D0c0/limboai.git
+	# Our fork of limbonaut/limboai, branch waifu-4.7.1: v1.8.1 plus two fixes that
+	# belong upstream - a TOOLS_ENABLED guard on the WindowWrapper include, and the
+	# two missing memdeletes in the BTForEach and BTSetVar tests. Rebase the branch
+	# onto the next upstream tag rather than merging, and drop a commit once it lands
+	# upstream.
 	# Never report working-tree changes inside the submodule, only a re-pin of the
 	# commit itself. Two things dirty it that are not ours to commit: opening demo/
 	# in the editor rewrites its .import artifacts, and `--doctool` adds Godot 4.7's

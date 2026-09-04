@@ -28,15 +28,6 @@ register_module_types = env.CommandNoCache(
 )
 
 
-# Fork-local: third-party modules vendored as submodules, whose test suites we do not
-# maintain and cannot patch - an edit inside a submodule working tree is never committed by
-# this repository, so CI would check out the pinned commit and lose it. limboai's
-# test_for_each.h and test_set_var.h each memnew a Node they never free; doctest re-enters a
-# TEST_CASE body once per leaf SUBCASE, so those two leak 4 and 18 Node instances
-# respectively. LeakSanitizer rides along with use_asan=yes on Linux and fails `--test` on
-# all 22. Their runtime code is still built and shipped; only their tests are skipped.
-vendored_modules = ["limboai"]
-
 test_headers = []
 # libmodule_<name>.a for each active module.
 for name, path in env.module_list.items():
@@ -50,7 +41,7 @@ for name, path in env.module_list.items():
         lib = env_modules.add_library("module_%s" % name, env.modules_sources)
         env.Prepend(LIBS=[lib])
 
-    if env["tests"] and name not in vendored_modules:
+    if env["tests"]:
         # Lookup potential headers in `tests` subfolder.
         import glob
 

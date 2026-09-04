@@ -129,8 +129,9 @@ Fork modules so far: `waifu_test` (the reference), `projectiles` (`ProjectilePoo
 `ProjectileKind`), and `limboai` — behavior trees and hierarchical state machines.
 
 `limboai` is **vendored third-party code**, not ours: a **git submodule** tracking
-[limbonaut/limboai](https://github.com/limbonaut/limboai), pinned at tag `v1.8.1`
-(commit `e45e60e`), MIT licensed. Clone the fork with `--recursive`, or run
+[Th3D0c0/limboai](https://github.com/Th3D0c0/limboai), our fork of
+[limbonaut/limboai](https://github.com/limbonaut/limboai), on branch `waifu-4.7.1` —
+tag `v1.8.1` (commit `e45e60e`) plus two commits that belong upstream. MIT licensed. Clone the fork with `--recursive`, or run
 `git submodule update --init` in an existing checkout, or the module directory is empty
 and the build silently drops behavior trees. Re-pin it with a checkout inside the
 submodule followed by a commit of the new gitlink in the parent:
@@ -143,9 +144,31 @@ git add modules/limboai && git commit -m "Bump limboai to v1.9.0"
 
 Pick its version from the compatibility table in its README, not from what is newest:
 the `1.8.x` line is the one built against Godot 4.7, and its `deps.env` says
-`GODOT_REF=4.7-stable`. Do not edit anything under it — a local change is a merge
-conflict on every upgrade, exactly like a core patch. Its CODEOWNERS line exists only
-to satisfy the CI hook; it does not mean we maintain it — and note that line is written
+`GODOT_REF=4.7-stable`.
+
+**Do not edit it in place.** A change inside a submodule working tree is never committed
+by this repository — CI checks out the pinned commit and the edit vanishes, which is the
+trap that makes a local fix look like it works. Anything genuinely wrong with limboai goes
+on the `waifu-4.7.1` branch of our fork instead:
+
+```sh
+git -C modules/limboai checkout waifu-4.7.1
+# ... fix, commit ...
+git -C modules/limboai push fork waifu-4.7.1
+git add modules/limboai && git commit -m "Bump limboai"   # record the new gitlink
+```
+
+Keep that branch a thin, rebasable stack on top of an upstream tag, and every commit on it
+worth upstreaming — the point is for it to shrink, not grow. It currently carries:
+
+| Commit | Fix | Was worked around by |
+|---|---|---|
+| `2cb92a8` | `TOOLS_ENABLED` guard on `compat_window_wrapper.h`'s `editor/gui/window_wrapper.h` include — the module's only unguarded editor include, which broke all 10 template jobs | deleting only editor TUs in `godot-build` |
+| `b5aab26` | The missing `memdelete(dummy)` in `tests/test_for_each.h` and `tests/test_set_var.h`, 22 leaked Nodes that LeakSanitizer failed the test run on | skipping vendored test suites in `modules/SCsub` |
+
+Both workarounds have been reverted, so those two upstream files are pristine again.
+
+Its CODEOWNERS line exists only to satisfy the CI hook; it does not mean we maintain it — and note that line is written
 **without** a trailing slash (`/modules/limboai`), because a submodule is a single gitlink
 entry in the tree rather than a directory, so the usual `/modules/<name>/` directory pattern
 matches nothing and `validate_codeowners.py` reports `<UNOWNED>`.
@@ -192,9 +215,7 @@ Keep this list accurate — it is the rebase checklist.
 |---|---|---|
 | `.github/CODEOWNERS` | Fork-local block appended at EOF, one line per fork module (`/modules/waifu_test/`, `/modules/projectiles/`, both `@Th3D0c0`) | Required by the `validate-codeowners` CI hook; every file under `modules/` must have an owner. Placed at EOF (last-match-wins) so it also claims each module's `SCsub`/`config.py`, and because appending conflicts less than inserting into the Modules section. Add a line here with every new module. |
 | `modules/jolt_physics/jolt_physics_server_3d.{h,cpp}` | `_bind_methods()` given a body: binds the four `generic_6dof_joint_*_jolt_{param,flag}` methods and their enum constants, and `init()`/`finish()` register/unregister an `Engine` singleton named `JoltPhysicsServer3D` | Jolt's 6DOF extensions exist in C++ but are unreachable from GDScript: upstream leaves `_bind_methods` empty, and the `PhysicsServer3D` scripting singleton is registered before the configured backend is constructed, so it captures the placeholder. The VR hand drives need `G6DOF_JOINT_ANGULAR_SPRING_FREQUENCY` (inertia-independent damping ratio) and `G6DOF_JOINT_ANGULAR_SPRING_MAX_TORQUE` (a real torque ceiling instead of clamping the commanded angle). Rationale is in the comments at the top of the `.cpp`. |
-| `.github/actions/godot-build/action.yml` | The template-build guard deletes only editor translation units (`find editor -type f \( -name '*.cpp' … \) -delete`) instead of `rm -rf editor` | `modules/limboai`'s `compat/compat_window_wrapper.h` includes `editor/gui/window_wrapper.h` under `LIMBOAI_MODULE` with no `TOOLS_ENABLED` guard, so every template build needs that header to resolve. The TU is empty in a module build — its whole body is `#ifdef LIMBOAI_GDEXTENSION` — so keeping headers costs nothing, and deleting the sources still fails the link if editor code ever genuinely leaks into a template. Revert to `rm -rf editor` once limboai guards the include. |
 | `modules/mono/build_scripts/build_assemblies.py` | `NoWarn` extended from `1591` to `1591%3B0108` | CI builds the generated C# glue with `--werror`, and the glue is generated from ClassDB, so a third-party module that collides with a base member becomes a CS0108 error. `modules/limboai` does it twice (`BTTask.Status` over `BT.Status`, `BBParam.GetType()` over `object.GetType()`); the generator cannot emit `new` and the submodule is not ours to patch. `%3B` is a literal `;` — MSBuild splits an unescaped one in a `/p:` value into a second property. |
-| `modules/SCsub` | A `vendored_modules` list (currently `["limboai"]`); those modules' `tests/*.h` are not collected into `modules_tests.gen.h` | limboai's `tests/test_for_each.h` and `tests/test_set_var.h` each `memnew` a `Node` they never free, and doctest re-enters a `TEST_CASE` body once per leaf `SUBCASE` — 4 and 18 instances, the 22 `ObjectDB` leaks the suite reports. LeakSanitizer comes along with `use_asan=yes` on Linux and fails `--test` on them. The tests are limboai's and we cannot patch them from here. Runtime code is unaffected; only the vendored test suite is skipped. |
 | `.github/workflows/linux_builds.yml` | `module_limboai_enabled=no` added to the "Editor with doubles and GCC sanitizers" job only | That job is the largest link in the matrix — ASan + UBSan + doubles at `-O0` — and upstream already sat just under the 2 GB reach of `R_X86_64_PC32`. limboai pushed it ~25 MiB past, and mold failed with 120 `relocation out of range` errors against `libstdc++.a`'s `.gcc_except_table`. Purely a size ceiling, not a code defect: the module still builds under GCC on the Mono editor job, under clang on the other two sanitizer jobs, and on every template and non-Linux job. If a future addition overflows it again, the next lever is `optimize=debug` on that job. |
 | `doc/classes/@GlobalScope.xml` | One `<member name="LimboUtility">` entry | limboai registers a `LimboUtility` engine singleton, so `--doctool` genuinely emits it and the `Check for class reference updates` step fails until it is committed. Correct rather than a workaround — the fork's engine really does expose that singleton. Regenerate with `bin/godot... --doctool --headless` if the set of fork singletons changes. |
 | `.github/workflows/static_checks.yml` | `submodules: recursive` on the checkout | The only workflow that did not clone submodules, which was fine until `@GlobalScope.xml` gained a `LimboUtility` member — `make-rst` resolves types across the whole reference and `LimboUtility.xml` lives in `modules/limboai/doc_classes`, so it reported `Unresolved type` twice plus an unrecognized `[LimboUtility]` tag. Both the type attribute and the description need the submodule, so this cannot be dodged by rewording the doc. File-based hooks are unaffected: submodule content is not in this repository's index. |
