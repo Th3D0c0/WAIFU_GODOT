@@ -164,9 +164,20 @@ worth upstreaming — the point is for it to shrink, not grow. It currently carr
 | Commit | Fix | Was worked around by |
 |---|---|---|
 | `2cb92a8` | `TOOLS_ENABLED` guard on `compat_window_wrapper.h`'s `editor/gui/window_wrapper.h` include — the module's only unguarded editor include, which broke all 10 template jobs | deleting only editor TUs in `godot-build` |
-| `b5aab26` | The missing `memdelete(dummy)` in `tests/test_for_each.h` and `tests/test_set_var.h`, 22 leaked Nodes that LeakSanitizer failed the test run on | skipping vendored test suites in `modules/SCsub` |
+| `b5aab26` | The missing `memdelete(dummy)` in `tests/test_for_each.h` and `tests/test_set_var.h`, 22 leaked Nodes that LeakSanitizer failed the test run on | — |
 
-Both workarounds have been reverted, so those two upstream files are pristine again.
+Both are open upstream as [#475](https://github.com/limbonaut/limboai/pull/475) and
+[#476](https://github.com/limbonaut/limboai/pull/476); drop the commit here when either
+lands.
+
+`2cb92a8` let `godot-build/action.yml` go back to upstream's `rm -rf editor`. `b5aab26`
+did **not** buy back the `modules/SCsub` skip, and re-enabling limboai's tests on the
+strength of it is a trap worth not repeating: the leak was never the only thing wrong
+with that suite. `dev_mode` implies `tests=yes` for template targets too, so CI runs
+`--test` on every binary it builds, and limboai's `test_call_method.h` crashes there —
+its "Should fail with 0 arguments" subcase expects the argument-count validation that
+Godot compiles out when `DEBUG_ENABLED` is off. Whether more of its tests assume a debug
+build is unknown, because doctest stops at the first crash.
 
 Its CODEOWNERS line exists only to satisfy the CI hook; it does not mean we maintain it — and note that line is written
 **without** a trailing slash (`/modules/limboai`), because a submodule is a single gitlink
@@ -219,6 +230,7 @@ Keep this list accurate — it is the rebase checklist.
 | `.github/workflows/linux_builds.yml` | `module_limboai_enabled=no` added to the "Editor with doubles and GCC sanitizers" job only | That job is the largest link in the matrix — ASan + UBSan + doubles at `-O0` — and upstream already sat just under the 2 GB reach of `R_X86_64_PC32`. limboai pushed it ~25 MiB past, and mold failed with 120 `relocation out of range` errors against `libstdc++.a`'s `.gcc_except_table`. Purely a size ceiling, not a code defect: the module still builds under GCC on the Mono editor job, under clang on the other two sanitizer jobs, and on every template and non-Linux job. If a future addition overflows it again, the next lever is `optimize=debug` on that job. |
 | `doc/classes/@GlobalScope.xml` | One `<member name="LimboUtility">` entry | limboai registers a `LimboUtility` engine singleton, so `--doctool` genuinely emits it and the `Check for class reference updates` step fails until it is committed. Correct rather than a workaround — the fork's engine really does expose that singleton. Regenerate with `bin/godot... --doctool --headless` if the set of fork singletons changes. |
 | `.github/workflows/static_checks.yml` | `submodules: recursive` on the checkout | The only workflow that did not clone submodules, which was fine until `@GlobalScope.xml` gained a `LimboUtility` member — `make-rst` resolves types across the whole reference and `LimboUtility.xml` lives in `modules/limboai/doc_classes`, so it reported `Unresolved type` twice plus an unrecognized `[LimboUtility]` tag. Both the type attribute and the description need the submodule, so this cannot be dodged by rewording the doc. File-based hooks are unaffected: submodule content is not in this repository's index. |
+| `modules/SCsub` | A `vendored_modules` list (currently `["limboai"]`); those modules' `tests/*.h` are not collected into `modules_tests.gen.h` | limboai's suite is not template-safe, and `dev_mode` means CI runs `--test` on template binaries too. `tests/test_call_method.h` calls a method with the wrong argument count and expects `BTTask::FAILURE`, which needs the validation Godot compiles out without `DEBUG_ENABLED`; in `template_release` the call goes through and crashes the process, taking the suite with it. Not ours to maintain, and the crash is upstream's to fix. |
 
 No diffs under `core/`, `scene/`, `servers/`, or `drivers/`. Keep it that way. The
 `jolt_physics` row above is a module, not core, but it is still an upstream file and will

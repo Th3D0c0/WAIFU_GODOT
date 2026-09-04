@@ -28,6 +28,17 @@ register_module_types = env.CommandNoCache(
 )
 
 
+# Fork-local: third-party modules vendored as submodules, whose test suites we do not
+# maintain. limboai's is not safe to run in a template build, and CI runs every binary it
+# produces with --test because dev_mode implies tests=yes for templates too. Its
+# tests/test_call_method.h "Should fail with 0 arguments" subcase calls a method with the
+# wrong argument count and expects BTTask::FAILURE, which relies on the argument-count
+# validation Godot compiles out when DEBUG_ENABLED is off - so in template_release the call
+# goes through and the process crashes, taking the whole suite with it. Whether more of its
+# tests share that assumption is unknown, since doctest stops at the first crash.
+# Their runtime code is still built and shipped; only their tests are skipped.
+vendored_modules = ["limboai"]
+
 test_headers = []
 # libmodule_<name>.a for each active module.
 for name, path in env.module_list.items():
@@ -41,7 +52,7 @@ for name, path in env.module_list.items():
         lib = env_modules.add_library("module_%s" % name, env.modules_sources)
         env.Prepend(LIBS=[lib])
 
-    if env["tests"]:
+    if env["tests"] and name not in vendored_modules:
         # Lookup potential headers in `tests` subfolder.
         import glob
 
