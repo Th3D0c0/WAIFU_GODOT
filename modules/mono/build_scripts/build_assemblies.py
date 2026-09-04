@@ -206,7 +206,16 @@ def build_godot_api(msbuild_tool, module_dir, output_dir, push_nupkgs_local, pre
 
         targets = [os.path.join(editor_api_dir, filename) for filename in target_filenames]
 
-        args = ["/restore", "/t:Build", "/p:Configuration=" + build_config, "/p:NoWarn=1591"]
+        # 1591 is upstream: the generated glue has no XML doc comments.
+        # 0108 is fork-local. The C# glue is generated from ClassDB, so a third-party
+        # module whose C++ API happens to collide with a base member produces a member
+        # that hides an inherited one, and CI builds the glue with -warnaserror.
+        # modules/limboai does this twice - BTTask.Status over BT.Status, and
+        # BBParam.GetType() over object.GetType() - and neither is reachable from a
+        # vendored submodule we do not patch. The generator cannot emit `new`, so the
+        # only lever here is the warning itself. %3B is a literal semicolon: MSBuild
+        # splits an unescaped one in a /p: value into a second property.
+        args = ["/restore", "/t:Build", "/p:Configuration=" + build_config, "/p:NoWarn=1591%3B0108"]
         if push_nupkgs_local:
             args += ["/p:ClearNuGetLocalCache=true", "/p:PushNuGetToLocalSource=" + push_nupkgs_local]
         if precision == "double":

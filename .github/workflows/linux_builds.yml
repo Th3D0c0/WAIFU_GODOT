@@ -50,6 +50,14 @@ jobs:
             cache-name: linux-editor-double-sanitizers
             target: editor
             # Debug symbols disabled as they're huge on this build and we hit the 14 GB limit for runners.
+            # Fork-local: module_limboai_enabled=no. This is the largest configuration in
+            # the matrix - ASan plus UBSan plus doubles at -O0 - and it sat just under the
+            # 2 GB reach of R_X86_64_PC32. Adding limboai pushed the link 25 MiB past it and
+            # mold failed with 120 "relocation out of range" errors against libstdc++.a's
+            # .gcc_except_table. limboai is ~30 MiB of archive before instrumentation, so
+            # dropping it here restores upstream's headroom. The module still builds under
+            # GCC on the Mono editor job, under clang on the other two sanitizer jobs, and
+            # on every template and non-Linux job; only this one skips it, and only for room.
             scons-flags: >-
               dev_build=yes
               scu_build=yes
@@ -58,6 +66,7 @@ jobs:
               use_asan=yes
               use_ubsan=yes
               linker=mold
+              module_limboai_enabled=no
             bin: ./bin/godot.linuxbsd.editor.dev.double.x86_64.san
             proj-test: true
             free-space: true

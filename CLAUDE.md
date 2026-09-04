@@ -11,6 +11,11 @@ Quest 3 / Android later — so modules must stay mobile-safe.
 
 Toolchain on this machine: **MSVC (`cl`)**, Python 3.9.9, SCons 4.9.1, **32 cores**.
 No ccache/sccache installed — full rebuilds are expensive, incremental builds are the norm.
+`gh` is installed and authenticated as `Th3D0c0`, so CI failures can be read directly:
+`gh run list`, then `gh run view --job <id> --log`. Worth doing before theorising about a
+red job — the anonymous REST API serves run and job metadata but returns 403 for logs, and
+check-run annotations only capture what a problem matcher recognized, which silently misses
+linker errors.
 
 ```sh
 # Editor build (what bin/godot.windows.editor.x86_64.exe currently is)
@@ -171,8 +176,11 @@ Keep this list accurate — it is the rebase checklist.
 | File | Change | Why |
 |---|---|---|
 | `.github/CODEOWNERS` | Fork-local block appended at EOF, one line per fork module (`/modules/waifu_test/`, `/modules/projectiles/`, both `@Th3D0c0`) | Required by the `validate-codeowners` CI hook; every file under `modules/` must have an owner. Placed at EOF (last-match-wins) so it also claims each module's `SCsub`/`config.py`, and because appending conflicts less than inserting into the Modules section. Add a line here with every new module. |
-
 | `modules/jolt_physics/jolt_physics_server_3d.{h,cpp}` | `_bind_methods()` given a body: binds the four `generic_6dof_joint_*_jolt_{param,flag}` methods and their enum constants, and `init()`/`finish()` register/unregister an `Engine` singleton named `JoltPhysicsServer3D` | Jolt's 6DOF extensions exist in C++ but are unreachable from GDScript: upstream leaves `_bind_methods` empty, and the `PhysicsServer3D` scripting singleton is registered before the configured backend is constructed, so it captures the placeholder. The VR hand drives need `G6DOF_JOINT_ANGULAR_SPRING_FREQUENCY` (inertia-independent damping ratio) and `G6DOF_JOINT_ANGULAR_SPRING_MAX_TORQUE` (a real torque ceiling instead of clamping the commanded angle). Rationale is in the comments at the top of the `.cpp`. |
+| `.github/actions/godot-build/action.yml` | The template-build guard deletes only editor translation units (`find editor -type f \( -name '*.cpp' … \) -delete`) instead of `rm -rf editor` | `modules/limboai`'s `compat/compat_window_wrapper.h` includes `editor/gui/window_wrapper.h` under `LIMBOAI_MODULE` with no `TOOLS_ENABLED` guard, so every template build needs that header to resolve. The TU is empty in a module build — its whole body is `#ifdef LIMBOAI_GDEXTENSION` — so keeping headers costs nothing, and deleting the sources still fails the link if editor code ever genuinely leaks into a template. Revert to `rm -rf editor` once limboai guards the include. |
+| `modules/mono/build_scripts/build_assemblies.py` | `NoWarn` extended from `1591` to `1591%3B0108` | CI builds the generated C# glue with `--werror`, and the glue is generated from ClassDB, so a third-party module that collides with a base member becomes a CS0108 error. `modules/limboai` does it twice (`BTTask.Status` over `BT.Status`, `BBParam.GetType()` over `object.GetType()`); the generator cannot emit `new` and the submodule is not ours to patch. `%3B` is a literal `;` — MSBuild splits an unescaped one in a `/p:` value into a second property. |
+| `modules/SCsub` | A `vendored_modules` list (currently `["limboai"]`); those modules' `tests/*.h` are not collected into `modules_tests.gen.h` | limboai's `tests/test_for_each.h` and `tests/test_set_var.h` each `memnew` a `Node` they never free, and doctest re-enters a `TEST_CASE` body once per leaf `SUBCASE` — 4 and 18 instances, the 22 `ObjectDB` leaks the suite reports. LeakSanitizer comes along with `use_asan=yes` on Linux and fails `--test` on them. The tests are limboai's and we cannot patch them from here. Runtime code is unaffected; only the vendored test suite is skipped. |
+| `.github/workflows/linux_builds.yml` | `module_limboai_enabled=no` added to the "Editor with doubles and GCC sanitizers" job only | That job is the largest link in the matrix — ASan + UBSan + doubles at `-O0` — and upstream already sat just under the 2 GB reach of `R_X86_64_PC32`. limboai pushed it ~25 MiB past, and mold failed with 120 `relocation out of range` errors against `libstdc++.a`'s `.gcc_except_table`. Purely a size ceiling, not a code defect: the module still builds under GCC on the Mono editor job, under clang on the other two sanitizer jobs, and on every template and non-Linux job. If a future addition overflows it again, the next lever is `optimize=debug` on that job. |
 
 No diffs under `core/`, `scene/`, `servers/`, or `drivers/`. Keep it that way. The
 `jolt_physics` row above is a module, not core, but it is still an upstream file and will

@@ -28,7 +28,16 @@ runs:
 
         if [ "${{ inputs.target }}" != "editor" ]; then
           # Ensure we don't include editor code in export template builds.
-          rm -rf editor
+          #
+          # Fork-local: upstream deletes the whole `editor` tree here. We delete only the
+          # translation units and keep the headers, because modules/limboai's compat layer
+          # includes `editor/gui/window_wrapper.h` from compat_window_wrapper.cpp without a
+          # TOOLS_ENABLED guard. That file is empty in a module template build - its body is
+          # all `#ifdef LIMBOAI_GDEXTENSION` - so the include costs nothing, but it does have
+          # to resolve. Removing the sources still enforces what this step is for: with no
+          # editor object files, any template build that genuinely uses editor code fails to
+          # link. Drop this back to `rm -rf editor` once limboai guards that include.
+          find editor -type f \( -name '*.cpp' -o -name '*.c' -o -name '*.mm' -o -name '*.m' \) -delete
         fi
 
         if [ "${{ github.event.number }}" != "" ]; then
